@@ -1,0 +1,81 @@
+{
+  "spec_version": "3.0.0",
+  "security_clearance": "enterprise-restricted",
+  "correlation_id": "tx-fixture-001",
+  "domain_boundary": {
+    "context_name": "BillingEngine",
+    "aggregate_root": "Invoice"
+  },
+  "contract_interface": {
+    "strict_inputs": [
+      {
+        "name": "account_id",
+        "type": "string",
+        "format": "uuid",
+        "minimum": null,
+        "maximum": null,
+        "pattern": null,
+        "enum": null,
+        "required": true
+      },
+      {
+        "name": "amount_in_cents",
+        "type": "integer",
+        "format": null,
+        "minimum": 1,
+        "maximum": null,
+        "pattern": null,
+        "enum": null,
+        "required": true
+      },
+      {
+        "name": "currency",
+        "type": "string",
+        "format": null,
+        "minimum": null,
+        "maximum": null,
+        "pattern": "^[A-Z]{3}$",
+        "enum": null,
+        "required": true
+      }
+    ],
+    "strict_outputs": [
+      {
+        "name": "transaction_id",
+        "type": "string",
+        "format": "uuid",
+        "minimum": null,
+        "maximum": null,
+        "pattern": null,
+        "enum": null,
+        "required": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "format": null,
+        "minimum": null,
+        "maximum": null,
+        "pattern": null,
+        "enum": ["settled", "deferred_processing"],
+        "required": true
+      }
+    ]
+  },
+  "architectural_invariants": {
+    "concurrency_control": "optimistic_locking",
+    "idempotency_strategy": "header_token_verification",
+    "allow_shared_memory": false
+  },
+  "mutation_testing_criteria": {
+    "minimum_mutation_score": 0.85,
+    "target_test_framework": "pytest-v8",
+    "excluded_mutators": ["ODD_FLAVOR_MUTATION"]
+  },
+  "fail_safe_protocols": [
+    {
+      "trigger_exception": "DatabaseTimeoutException",
+      "reversal_action": "abort_transaction_and_emit_compensation_event"
+    }
+  ]
+}

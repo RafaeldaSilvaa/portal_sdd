@@ -1,0 +1,89 @@
+name: portal_sdd
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: portal_sdd-db
+    environment:
+      POSTGRES_DB: emasdep
+      POSTGRES_USER: emasdep
+      POSTGRES_PASSWORD: emasdep
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emasdep -d emasdep"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: portal_sdd-ollama
+    ports:
+      - "11436:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "ollama serve & sleep 3 && ollama pull llama3.2:1b 2>&1 & wait"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 15s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: portal_sdd-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - EMASDEP_DATABASE_URL=postgresql://emasdep:emasdep@db:5432/emasdep
+      - EMASDEP_LLM_PROVIDER=ollama
+      - EMASDEP_LLM_MODEL=llama3.2:1b
+      - EMASDEP_LLM_BASE_URL=http://ollama:11434
+      - EMASDEP_LLM_TEMPERATURE=0.0
+      - EMASDEP_LLM_MAX_TOKENS=8192
+      - EMASDEP_ENV=production
+      - EMASDEP_SANDBOX_TYPE=none
+      - EMASDEP_TELEMETRY_ENABLED=true
+    volumes:
+      - ./skills:/app/skills:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/health').raise_for_status()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: portal_sdd-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  ollama_models:
