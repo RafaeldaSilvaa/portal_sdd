@@ -11,10 +11,14 @@ from ..core.types import AgentRole, TaskDAG, TaskNode
 
 
 class PlannerAgent(LLMAgent):
-    def __init__(self, config: LLMConfig | None = None):
+    def __init__(self, config: LLMConfig | None = None) -> None:
         super().__init__(config)
 
     def build_system_prompt(self) -> str:
+        """build system prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         return (
             "You are a Graph Compiler. "
             "Decompose the SDD into a Directed Acyclic Graph (DAG) of "
@@ -22,6 +26,14 @@ class PlannerAgent(LLMAgent):
         )
 
     async def build_dag(self, sdd: str, spec: dict | None = None) -> TaskDAG:
+        """build dag.
+
+Args:
+    sdd: Descrição do parâmetro sdd.
+    spec: Descrição do parâmetro spec.
+
+Retorna:
+    Descrição do valor retornado."""
         response: LLMResponse = await self.call(
             prompt=(
                 f"SDD:\n{sdd[:3000]}\n\n"
@@ -58,6 +70,13 @@ class PlannerAgent(LLMAgent):
         return dag
 
     def _compute_order(self, dag: TaskDAG) -> list[str]:
+        """ compute order.
+
+Args:
+    dag: Descrição do parâmetro dag.
+
+Retorna:
+    Descrição do valor retornado."""
         graph = DiGraph()
         for task_id, node in dag.tasks.items():
             graph.add_node(task_id)
@@ -70,6 +89,10 @@ class PlannerAgent(LLMAgent):
             return list(dag.tasks.keys())
 
     def _default_task(self) -> dict:
+        """ default task.
+
+Retorna:
+    Descrição do valor retornado."""
         return {
             "task_id": "task_001",
             "description": "Implement core domain logic",

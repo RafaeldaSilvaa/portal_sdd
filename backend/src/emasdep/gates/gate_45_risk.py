@@ -17,7 +17,7 @@ from .base import PipelineGate
 
 
 class RiskAnalysisGate(PipelineGate):
-    def __init__(self, llm_config: LLMConfig | None = None):
+    def __init__(self, llm_config: LLMConfig | None = None) -> None:
         self._agent = _RiskAgent(config=llm_config)
 
     @property
@@ -29,6 +29,13 @@ class RiskAnalysisGate(PipelineGate):
         return "Risk & Trade-off Analysis"
 
     async def process(self, ctx: PipelineContext) -> PipelineContext:
+        """process.
+
+Args:
+    ctx: Descrição do parâmetro ctx.
+
+Retorna:
+    Descrição do valor retornado."""
         if not ctx.sdd:
             ctx.failure_reason = "No SDD available for risk analysis"
             ctx.current_state = PipelineState.FAILED
@@ -43,10 +50,14 @@ class RiskAnalysisGate(PipelineGate):
 
 
 class _RiskAgent(LLMAgent):
-    def __init__(self, config: LLMConfig | None = None):
+    def __init__(self, config: LLMConfig | None = None) -> None:
         super().__init__(config)
 
     def build_system_prompt(self) -> str:
+        """build system prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         return (
             "You are a Risk & Trade-off Analyst. "
             "Analyze system design documents for risks, failure scenarios, "
@@ -55,6 +66,14 @@ class _RiskAgent(LLMAgent):
         )
 
     async def analyze(self, sdd: str, spec: dict | None) -> RiskAnalysis:
+        """analyze.
+
+Args:
+    sdd: Descrição do parâmetro sdd.
+    spec: Descrição do parâmetro spec.
+
+Retorna:
+    Descrição do valor retornado."""
         prompt = (
             f"SDD:\n{sdd[:3000]}\n\n"
             f"Spec:\n{json.dumps(spec, indent=2)[:2000] if spec else 'N/A'}\n\n"
@@ -100,6 +119,13 @@ class _RiskAgent(LLMAgent):
         )
 
     def _default_risk(self, sdd: str) -> RiskAnalysis:
+        """ default risk.
+
+Args:
+    sdd: Descrição do parâmetro sdd.
+
+Retorna:
+    Descrição do valor retornado."""
         return RiskAnalysis(
             risks=[RiskItem("Unspecified risk", 0.5, "medium", "Review SDD for hidden assumptions")],
             trade_offs=[],

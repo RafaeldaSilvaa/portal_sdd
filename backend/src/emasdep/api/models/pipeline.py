@@ -31,6 +31,17 @@ class PipelineRun(Base):
     updated_at: Mapped[datetime] = Column(DateTime, default=lambda: datetime.now(tz.utc), onupdate=lambda: datetime.now(tz.utc))
 
 
+class PipelineLog(Base):
+    __tablename__ = "pipeline_logs"
+
+    id: Mapped[int] = Column(Integer, primary_key=True, autoincrement=True)
+    correlation_id: Mapped[str] = Column(String(64), nullable=False, index=True)
+    message: Mapped[str] = Column(Text, nullable=False)
+    level: Mapped[str] = Column(String(16), default="info")
+    gate: Mapped[str] = Column(String(32), default="")
+    created_at: Mapped[datetime] = Column(DateTime, default=lambda: datetime.now(tz.utc))
+
+
 class ProbingQuestion(Base):
     __tablename__ = "probing_questions"
 

@@ -8,10 +8,14 @@ from .base import LLMAgent, LLMConfig, LLMResponse
 
 
 class EngineerAgent(LLMAgent):
-    def __init__(self, config: LLMConfig | None = None):
+    def __init__(self, config: LLMConfig | None = None) -> None:
         super().__init__(config)
 
     def build_system_prompt(self) -> str:
+        """build system prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         return (
             "You are a High-Velocity Constructor. "
             "Write production-ready Python 3.12 code that passes the provided tests. "
@@ -19,6 +23,15 @@ class EngineerAgent(LLMAgent):
         )
 
     async def generate_code(self, task_description: str, test_suite: str, spec: dict) -> str:
+        """generate code.
+
+Args:
+    task_description: Descrição do parâmetro task_description.
+    test_suite: Descrição do parâmetro test_suite.
+    spec: Descrição do parâmetro spec.
+
+Retorna:
+    Descrição do valor retornado."""
         response: LLMResponse = await self.call(
             prompt=(
                 f"Task: {task_description}\n"

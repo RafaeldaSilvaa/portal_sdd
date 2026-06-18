@@ -1,6 +1,6 @@
 import logging
 import os
-from sqlalchemy import create_engine, text
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 logger = logging.getLogger("emasdep.db")
@@ -11,6 +11,10 @@ class Base(DeclarativeBase):
 
 
 def get_database_url() -> str:
+    """get database url.
+
+Retorna:
+    Descrição do valor retornado."""
     url = os.getenv("EMASDEP_DATABASE_URL")
     if url:
         return url
@@ -20,7 +24,14 @@ def get_database_url() -> str:
     )
 
 
-def _make_engine(url=None):
+def _make_engine(url: str | None = None) -> Engine:
+    """ make engine.
+
+Args:
+    url: Descrição do parâmetro url.
+
+Retorna:
+    Descrição do valor retornado."""
     url = url or get_database_url()
     return create_engine(
         url,
@@ -34,7 +45,14 @@ def _make_engine(url=None):
     )
 
 
-def _make_session(engine=None):
+def _make_session(engine: Engine | None = None) -> sessionmaker:
+    """ make session.
+
+Args:
+    engine: Descrição do parâmetro engine.
+
+Retorna:
+    Descrição do valor retornado."""
     return sessionmaker(
         bind=engine or _make_engine(),
         autocommit=False,
@@ -46,7 +64,11 @@ engine = None
 SessionLocal = None
 
 
-def ensure_engine():
+def ensure_engine() -> Engine:
+    """ensure engine.
+
+Retorna:
+    Descrição do valor retornado."""
     global engine, SessionLocal
     if engine is None:
         engine = _make_engine()
@@ -54,7 +76,11 @@ def ensure_engine():
     return engine
 
 
-def migrate_schema():
+def migrate_schema() -> None:
+    """migrate schema.
+
+Retorna:
+    Descrição do valor retornado."""
     url = get_database_url()
     is_sqlite = url.startswith("sqlite")
     eng = ensure_engine()
@@ -86,6 +112,10 @@ def migrate_schema():
 
 
 def get_db():
+    """get db.
+
+Retorna:
+    None"""
     db = SessionLocal() if SessionLocal else _make_session(ensure_engine())()
     try:
         yield db

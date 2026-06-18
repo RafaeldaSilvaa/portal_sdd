@@ -21,6 +21,13 @@ class FileEntry:
 
 
 def _build_file_tree(run: PipelineRun) -> list[FileEntry]:
+    """ build file tree.
+
+Args:
+    run: Descrição do parâmetro run.
+
+Retorna:
+    Descrição do valor retornado."""
     files: list[FileEntry] = []
 
     if run.spec_json:
@@ -56,6 +63,14 @@ def _build_file_tree(run: PipelineRun) -> list[FileEntry]:
 
 
 def _find_file(run: PipelineRun, path: str) -> str | None:
+    """ find file.
+
+Args:
+    run: Descrição do parâmetro run.
+    path: Descrição do parâmetro path.
+
+Retorna:
+    Descrição do valor retornado."""
     if path == "spec.json" and run.spec_json:
         try:
             spec = json.loads(run.spec_json)
@@ -80,6 +95,14 @@ def _find_file(run: PipelineRun, path: str) -> str | None:
 
 
 def list_files(correlation_id: str, db: Session) -> list[FileEntry]:
+    """list files.
+
+Args:
+    correlation_id: Descrição do parâmetro correlation_id.
+    db: Descrição do parâmetro db.
+
+Retorna:
+    Descrição do valor retornado."""
     from .models.pipeline import PipelineRun
     run = db.query(PipelineRun).filter_by(correlation_id=correlation_id).first()
     if not run:
@@ -88,6 +111,15 @@ def list_files(correlation_id: str, db: Session) -> list[FileEntry]:
 
 
 def get_file_content(correlation_id: str, path: str, db: Session) -> str | None:
+    """get file content.
+
+Args:
+    correlation_id: Descrição do parâmetro correlation_id.
+    path: Descrição do parâmetro path.
+    db: Descrição do parâmetro db.
+
+Retorna:
+    Descrição do valor retornado."""
     from .models.pipeline import PipelineRun
     run = db.query(PipelineRun).filter_by(correlation_id=correlation_id).first()
     if not run:
@@ -96,6 +128,14 @@ def get_file_content(correlation_id: str, path: str, db: Session) -> str | None:
 
 
 def build_zip(correlation_id: str, db: Session) -> bytes | None:
+    """build zip.
+
+Args:
+    correlation_id: Descrição do parâmetro correlation_id.
+    db: Descrição do parâmetro db.
+
+Retorna:
+    Descrição do valor retornado."""
     from .models.pipeline import PipelineRun
     run = db.query(PipelineRun).filter_by(correlation_id=correlation_id).first()
     if not run:

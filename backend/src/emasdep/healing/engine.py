@@ -5,10 +5,11 @@ from __future__ import annotations
 import re
 import subprocess
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..core.types import CodePatchSnapshot, FailureCategory
+from .snapshot import SnapshotManager
 
 
 @dataclass
@@ -23,15 +24,21 @@ class HealingEngine:
     def __init__(
         self,
         max_attempts: int = 3,
-        snapshot_manager=None,
-    ):
+        snapshot_manager: SnapshotManager | None = None,
+    ) -> None:
+        """inicializa o motor de auto-cura com limite de tentativas."""
         self.max_attempts = max_attempts
-        self._snapshots = snapshot_manager
-        if self._snapshots is None:
-            from .snapshot import SnapshotManager
-            self._snapshots = SnapshotManager()
+        self._snapshots = snapshot_manager or SnapshotManager()
 
     def classify_failure(self, stderr: str, stdout: str) -> FailureCategory:
+        """classify failure.
+
+Args:
+    stderr: Descrição do parâmetro stderr.
+    stdout: Descrição do parâmetro stdout.
+
+Retorna:
+    Descrição do valor retornado."""
         combined = (stderr + "\n" + stdout).lower()
 
         if re.search(r"(no module named|import error|cannot import)", combined):
@@ -48,6 +55,14 @@ class HealingEngine:
         return FailureCategory.UNKNOWN
 
     def select_healing_strategy(self, category: FailureCategory, attempt: int) -> str:
+        """select healing strategy.
+
+Args:
+    category: Descrição do parâmetro category.
+    attempt: Descrição do parâmetro attempt.
+
+Retorna:
+    Descrição do valor retornado."""
         strategies = {
             FailureCategory.HALLUCINATION: "simplify_context",
             FailureCategory.SCHEMA_VIOLATION: "retry_same",
@@ -65,6 +80,7 @@ class HealingEngine:
         test_command: str = "pytest -x",
         test_content: str | None = None,
     ) -> HealingResult:
+        """tenta curar um artefato de código com falha nos testes."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             src_file = tmp_path / filepath

@@ -14,7 +14,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const {
     runs,
-    currentRun,
     probingQuestions,
     telemetry,
     loading,
@@ -45,11 +44,16 @@ export default function Dashboard() {
 
   const handleAnswer = async (questionId: string, answer: string) => {
     await answerQuestion(questionId, answer);
-    const updatedProbing = usePipelineStore.getState().probingQuestions;
-    if (updatedProbing.every((q) => q.answered)) {
+  };
+
+  const handleSubmitAll = async () => {
+    const updated = usePipelineStore.getState().probingQuestions;
+    const allDone = updated.every((q) => q.answered);
+    if (allDone) {
       setShowProbing(false);
-      if (currentRun) {
-        navigate(`/pipeline/${currentRun.correlation_id}`);
+      const run = usePipelineStore.getState().currentRun;
+      if (run) {
+        navigate(`/pipeline/${run.correlation_id}`);
       }
     }
   };
@@ -165,6 +169,7 @@ export default function Dashboard() {
         <ProbingModal
           questions={probingQuestions}
           onAnswer={handleAnswer}
+          onSubmitAll={handleSubmitAll}
           onClose={() => setShowProbing(false)}
         />
       )}

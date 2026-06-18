@@ -16,10 +16,24 @@ class ASTValidationResult:
 
 class ASTValidator:
     def validate(self, code: str) -> bool:
+        """validate.
+
+Args:
+    code: Descrição do parâmetro code.
+
+Retorna:
+    Descrição do valor retornado."""
         result = self.validate_detailed(code)
         return result.is_valid
 
     def validate_detailed(self, code: str) -> ASTValidationResult:
+        """validate detailed.
+
+Args:
+    code: Descrição do parâmetro code.
+
+Retorna:
+    Descrição do valor retornado."""
         result = ASTValidationResult(is_valid=True)
 
         try:
@@ -31,6 +45,13 @@ class ASTValidator:
         return result
 
     def validate_with_ruff(self, code: str) -> ASTValidationResult:
+        """validate with ruff.
+
+Args:
+    code: Descrição do parâmetro code.
+
+Retorna:
+    Descrição do valor retornado."""
         result = self.validate_detailed(code)
         if not result.is_valid:
             return result
@@ -52,6 +73,13 @@ class ASTValidator:
         return result
 
     def validate_with_mypy(self, code: str) -> ASTValidationResult:
+        """validate with mypy.
+
+Args:
+    code: Descrição do parâmetro code.
+
+Retorna:
+    Descrição do valor retornado."""
         import tempfile
         from pathlib import Path
 

@@ -7,13 +7,11 @@ import json
 
 import click
 
-from .api.main import app
-from .config import EMASDEPConfig
 from .orchestrator import PipelineOrchestrator
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """EMASDEP v3.0 - Enterprise Multi-Agent Spec-Driven Engineering Platform."""
 
 
@@ -21,7 +19,7 @@ def cli():
 @click.option("--host", default="0.0.0.0", help="Bind address")
 @click.option("--port", default=8000, help="Port number", type=int)
 @click.option("--reload", is_flag=True, help="Auto-reload on code changes")
-def serve(host: str, port: int, reload: bool):
+def serve(host: str, port: int, reload: bool) -> None:
     """Start the EMASDEP Portal API server."""
     import uvicorn
     uvicorn.run(
@@ -36,10 +34,14 @@ def serve(host: str, port: int, reload: bool):
 @cli.command()
 @click.argument("raw_intent")
 @click.option("--config", "-c", default=None, help="Config file path")
-def run(raw_intent: str, config: str | None):
+def run(raw_intent: str, config: str | None) -> None:
     """Run the full EMASDEP pipeline with a raw intent string."""
 
-    async def _run():
+    async def _run() -> None:
+        """ run.
+
+Retorna:
+    Descrição do valor retornado."""
         orchestrator = PipelineOrchestrator()
         result = await orchestrator.run_full_pipeline(raw_intent)
         click.echo(json.dumps({
@@ -55,7 +57,7 @@ def run(raw_intent: str, config: str | None):
 
 
 @cli.command()
-def version():
+def version() -> None:
     """Show EMASDEP version."""
     from . import __version__, __title__
     click.echo(f"{__title__} v{__version__}")

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 
@@ -37,7 +36,14 @@ class OrchestrationResult:
 
 
 class PipelineOrchestrator:
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: dict | None = None) -> None:
+        """  init  .
+
+Args:
+    config: Descrição do parâmetro config.
+
+Retorna:
+    Descrição do valor retornado."""
         self._state = StateMachine()
         self._config = config or {}
         self._tracer = PipelineTracer()
@@ -55,6 +61,13 @@ class PipelineOrchestrator:
         }
 
     async def run_full_pipeline(self, raw_intent: str) -> OrchestrationResult:
+        """run full pipeline.
+
+Args:
+    raw_intent: Descrição do parâmetro raw_intent.
+
+Retorna:
+    Descrição do valor retornado."""
         ctx = PipelineContext()
 
         try:
@@ -121,6 +134,7 @@ class PipelineOrchestrator:
     async def run_gate(
         self, ctx: PipelineContext, gate_id: PipelineGateID
     ) -> PipelineContext:
+        """executa um gate específico no pipeline."""
         gate = self._gates.get(gate_id)
         if not gate:
             logger.error("Unknown gate: %s", gate_id)

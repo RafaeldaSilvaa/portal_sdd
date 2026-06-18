@@ -1,6 +1,5 @@
 """WebSocket handler for real-time pipeline status streaming."""
 
-import asyncio
 import json
 import logging
 
@@ -10,10 +9,17 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineEventManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.active_connections: set[WebSocket] = set()
 
     async def connect(self, websocket: WebSocket):
+        """connect.
+
+Args:
+    websocket: Descrição do parâmetro websocket.
+
+Retorna:
+    None"""
         await websocket.accept()
         self.active_connections.add(websocket)
 
@@ -21,6 +27,14 @@ class PipelineEventManager:
         self.active_connections.discard(websocket)
 
     async def broadcast(self, event_type: str, data: dict):
+        """broadcast.
+
+Args:
+    event_type: Descrição do parâmetro event_type.
+    data: Descrição do parâmetro data.
+
+Retorna:
+    None"""
         payload = json.dumps({"type": event_type, "data": data})
         stale = set()
         for ws in self.active_connections:
@@ -35,6 +49,13 @@ manager = PipelineEventManager()
 
 
 async def pipeline_ws_handler(websocket: WebSocket):
+    """pipeline ws handler.
+
+Args:
+    websocket: Descrição do parâmetro websocket.
+
+Retorna:
+    None"""
     await manager.connect(websocket)
     try:
         while True:

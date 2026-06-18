@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -35,6 +35,13 @@ class LLMConfig:
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> LLMConfig:
+        """from env.
+
+Args:
+    env: Descrição do parâmetro env.
+
+Retorna:
+    Descrição do valor retornado."""
         e = env or {}
         provider_str = e.get("EMASDEP_LLM_PROVIDER", "openai").lower()
         provider_map = {
@@ -73,10 +80,17 @@ class LLMResponse:
 
 
 class LLMAgent(ABC):
-    def __init__(self, config: LLMConfig | None = None):
+    def __init__(self, config: LLMConfig | None = None) -> None:
         self.config = config or LLMConfig(provider=LLMProvider.MOCK)
 
     def _enrich_with_skills(self, system_prompt: str) -> str:
+        """ enrich with skills.
+
+Args:
+    system_prompt: Descrição do parâmetro system_prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         try:
             from ..skills.registry import SkillRegistry
             skills = SkillRegistry().discover()
@@ -88,6 +102,14 @@ class LLMAgent(ABC):
         return system_prompt
 
     async def call(self, prompt: str, system_prompt: str | None = None) -> LLMResponse:
+        """call.
+
+Args:
+    prompt: Descrição do parâmetro prompt.
+    system_prompt: Descrição do parâmetro system_prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         if system_prompt:
             system_prompt = self._enrich_with_skills(system_prompt)
         cfg = self.config
@@ -100,6 +122,14 @@ class LLMAgent(ABC):
         return await self._call_openai(prompt, system_prompt)
 
     async def _call_openai(self, prompt: str, system_prompt: str | None) -> LLMResponse:
+        """ call openai.
+
+Args:
+    prompt: Descrição do parâmetro prompt.
+    system_prompt: Descrição do parâmetro system_prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -146,6 +176,14 @@ class LLMAgent(ABC):
                 return self._mock_response(prompt)
 
     async def _call_ollama(self, prompt: str, system_prompt: str | None) -> LLMResponse:
+        """ call ollama.
+
+Args:
+    prompt: Descrição do parâmetro prompt.
+    system_prompt: Descrição do parâmetro system_prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         payload = {
             "model": self.config.model,
             "prompt": prompt,
@@ -183,6 +221,14 @@ class LLMAgent(ABC):
                 return self._mock_response(prompt)
 
     async def _call_gemini(self, prompt: str, system_prompt: str | None) -> LLMResponse:
+        """ call gemini.
+
+Args:
+    prompt: Descrição do parâmetro prompt.
+    system_prompt: Descrição do parâmetro system_prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         model = self.config.model or "gemini-2.0-flash"
         url = f"{self.config.base_url.rstrip('/')}/v1beta/models/{model}:generateContent"
         payload: dict[str, Any] = {
@@ -219,6 +265,13 @@ class LLMAgent(ABC):
                 return self._mock_response(prompt)
 
     def _mock_response(self, prompt: str) -> LLMResponse:
+        """ mock response.
+
+Args:
+    prompt: Descrição do parâmetro prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         return LLMResponse(
             content=json.dumps({
                 "simulated": True,

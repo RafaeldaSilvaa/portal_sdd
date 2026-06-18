@@ -13,11 +13,22 @@ class Skill(NamedTuple):
 
 
 class SkillRegistry:
-    def __init__(self, skills_path: str = "./skills"):
+    def __init__(self, skills_path: str = "./skills") -> None:
+        """  init  .
+
+Args:
+    skills_path: Descrição do parâmetro skills_path.
+
+Retorna:
+    Descrição do valor retornado."""
         self._path = Path(skills_path)
         self._cache: dict[str, Skill] = {}
 
     def discover(self) -> list[Skill]:
+        """discover.
+
+Retorna:
+    Descrição do valor retornado."""
         if not self._path.exists():
             return []
         skills: list[Skill] = []
@@ -29,6 +40,13 @@ class SkillRegistry:
         return skills
 
     def find_by_tags(self, tags: list[str]) -> list[Skill]:
+        """find by tags.
+
+Args:
+    tags: Descrição do parâmetro tags.
+
+Retorna:
+    Descrição do valor retornado."""
         results: list[Skill] = []
         for skill in self._cache.values():
             if any(tag.lower() in skill.name.lower() for tag in tags):
@@ -42,6 +60,13 @@ class SkillRegistry:
         return results
 
     def get(self, name: str) -> Skill | None:
+        """get.
+
+Args:
+    name: Descrição do parâmetro name.
+
+Retorna:
+    Descrição do valor retornado."""
         if name in self._cache:
             return self._cache[name]
         filepath = self._path / f"{name}.md"
@@ -52,6 +77,14 @@ class SkillRegistry:
         return None
 
     def register(self, name: str, content: str) -> Skill:
+        """register.
+
+Args:
+    name: Descrição do parâmetro name.
+    content: Descrição do parâmetro content.
+
+Retorna:
+    Descrição do valor retornado."""
         filepath = self._path / f"{name}.md"
         filepath.write_text(content, encoding="utf-8")
         skill = Skill(name=name, content=content, filepath=filepath)

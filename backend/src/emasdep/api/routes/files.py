@@ -4,14 +4,21 @@ from sqlalchemy.orm import Session
 
 from ..db.base import get_db
 from ..models.pipeline import PipelineRun
-from ..pipeline_files import FileEntry, list_files, get_file_content, build_zip
-from .pipeline import PipelineStatusResponse
+from ..pipeline_files import list_files, get_file_content, build_zip
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
 
 @router.get("/files/{correlation_id}")
 def list_pipeline_files(correlation_id: str, db: Session = Depends(get_db)):
+    """list pipeline files.
+
+Args:
+    correlation_id: Descrição do parâmetro correlation_id.
+    db: Descrição do parâmetro db.
+
+Retorna:
+    None"""
     run = db.query(PipelineRun).filter_by(correlation_id=correlation_id).first()
     if not run:
         raise HTTPException(404, "Pipeline run not found")
@@ -20,6 +27,15 @@ def list_pipeline_files(correlation_id: str, db: Session = Depends(get_db)):
 
 @router.get("/files/{correlation_id}/content")
 def get_pipeline_file_content(correlation_id: str, path: str, db: Session = Depends(get_db)):
+    """get pipeline file content.
+
+Args:
+    correlation_id: Descrição do parâmetro correlation_id.
+    path: Descrição do parâmetro path.
+    db: Descrição do parâmetro db.
+
+Retorna:
+    None"""
     run = db.query(PipelineRun).filter_by(correlation_id=correlation_id).first()
     if not run:
         raise HTTPException(404, "Pipeline run not found")
@@ -31,6 +47,14 @@ def get_pipeline_file_content(correlation_id: str, path: str, db: Session = Depe
 
 @router.get("/download/{correlation_id}")
 def download_pipeline_zip(correlation_id: str, db: Session = Depends(get_db)):
+    """download pipeline zip.
+
+Args:
+    correlation_id: Descrição do parâmetro correlation_id.
+    db: Descrição do parâmetro db.
+
+Retorna:
+    None"""
     run = db.query(PipelineRun).filter_by(correlation_id=correlation_id).first()
     if not run:
         raise HTTPException(404, "Pipeline run not found")

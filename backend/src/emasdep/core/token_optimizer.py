@@ -2,18 +2,31 @@
 
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass, field
-
 from .types import CompressedContext
 
 
 class TokenOptimizer:
-    def __init__(self, max_chars: int = 8000, max_history: int = 3):
+    def __init__(self, max_chars: int = 8000, max_history: int = 3) -> None:
+        """  init  .
+
+Args:
+    max_chars: Descrição do parâmetro max_chars.
+    max_history: Descrição do parâmetro max_history.
+
+Retorna:
+    Descrição do valor retornado."""
         self.max_chars = max_chars
         self.max_history = max_history
 
     def compress(self, text: str, preserve_sections: list[str] | None = None) -> CompressedContext:
+        """compress.
+
+Args:
+    text: Descrição do parâmetro text.
+    preserve_sections: Descrição do parâmetro preserve_sections.
+
+Retorna:
+    Descrição do valor retornado."""
         if len(text) <= self.max_chars:
             return CompressedContext(
                 original_length=len(text),
@@ -47,6 +60,15 @@ class TokenOptimizer:
         )
 
     def slice_relevant(self, context: list[str], query: str, max_items: int = 5) -> list[str]:
+        """slice relevant.
+
+Args:
+    context: Descrição do parâmetro context.
+    query: Descrição do parâmetro query.
+    max_items: Descrição do parâmetro max_items.
+
+Retorna:
+    Descrição do valor retornado."""
         if not context:
             return []
 

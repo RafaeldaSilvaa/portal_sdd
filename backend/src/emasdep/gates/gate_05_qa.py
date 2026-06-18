@@ -8,7 +8,7 @@ from .base import PipelineGate
 
 
 class QAGate(PipelineGate):
-    def __init__(self, agent: QAAgent | None = None):
+    def __init__(self, agent: QAAgent | None = None) -> None:
         self._agent = agent or QAAgent()
 
     @property
@@ -20,6 +20,13 @@ class QAGate(PipelineGate):
         return "Test Invariance Generation"
 
     async def process(self, ctx: PipelineContext) -> PipelineContext:
+        """process.
+
+Args:
+    ctx: Descrição do parâmetro ctx.
+
+Retorna:
+    Descrição do valor retornado."""
         spec_dict = ctx.spec or {}
         sdd = ctx.sdd or ""
         test_suite = await self._agent.generate_tests(spec_dict, sdd)

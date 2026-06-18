@@ -8,7 +8,7 @@ from .base import PipelineGate
 
 
 class ArchitectureGate(PipelineGate):
-    def __init__(self, agent: ArchitectAgent | None = None):
+    def __init__(self, agent: ArchitectAgent | None = None) -> None:
         self._agent = agent or ArchitectAgent()
 
     @property
@@ -20,6 +20,13 @@ class ArchitectureGate(PipelineGate):
         return "Structural Architecture Blueprint"
 
     async def process(self, ctx: PipelineContext) -> PipelineContext:
+        """process.
+
+Args:
+    ctx: Descrição do parâmetro ctx.
+
+Retorna:
+    Descrição do valor retornado."""
         if not ctx.spec:
             ctx.failure_reason = "No spec available for architecture generation"
             ctx.current_state = PipelineState.FAILED

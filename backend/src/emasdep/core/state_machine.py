@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from .types import PipelineContext, PipelineGateID, PipelineState
+from .types import PipelineGateID, PipelineState
 
 
 @dataclass
@@ -35,7 +35,7 @@ STATE_GRAPH: list[StateTransition] = [
 
 
 class StateMachine:
-    def __init__(self, initial_state: PipelineState = PipelineState.INIT):
+    def __init__(self, initial_state: PipelineState = PipelineState.INIT) -> None:
         self._state = initial_state
 
     @property
@@ -43,12 +43,27 @@ class StateMachine:
         return self._state
 
     def can_transition(self, target: PipelineState) -> bool:
+        """can transition.
+
+Args:
+    target: Descrição do parâmetro target.
+
+Retorna:
+    Descrição do valor retornado."""
         return any(
             t.from_state == self._state and t.to_state == target
             for t in STATE_GRAPH
         )
 
     def transition(self, target: PipelineState, condition: str = "") -> PipelineState:
+        """transition.
+
+Args:
+    target: Descrição do parâmetro target.
+    condition: Descrição do parâmetro condition.
+
+Retorna:
+    Descrição do valor retornado."""
         valid = [
             t
             for t in STATE_GRAPH
@@ -66,6 +81,10 @@ class StateMachine:
         return self._state
 
     def get_next_gate(self) -> PipelineGateID | None:
+        """get next gate.
+
+Retorna:
+    Descrição do valor retornado."""
         gate_map = {
             PipelineState.INIT: PipelineGateID.SPEC,
             PipelineState.SPEC_V1: PipelineGateID.PROBING,

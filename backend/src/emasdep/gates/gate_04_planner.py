@@ -8,7 +8,7 @@ from .base import PipelineGate
 
 
 class PlannerGate(PipelineGate):
-    def __init__(self, agent: PlannerAgent | None = None):
+    def __init__(self, agent: PlannerAgent | None = None) -> None:
         self._agent = agent or PlannerAgent()
 
     @property
@@ -20,6 +20,13 @@ class PlannerGate(PipelineGate):
         return "Deterministic Decomposition"
 
     async def process(self, ctx: PipelineContext) -> PipelineContext:
+        """process.
+
+Args:
+    ctx: Descrição do parâmetro ctx.
+
+Retorna:
+    Descrição do valor retornado."""
         sdd = ctx.sdd or ""
         dag = await self._agent.build_dag(sdd, ctx.spec)
         ctx.task_dag = dag

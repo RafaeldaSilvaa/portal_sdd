@@ -1,4 +1,4 @@
-"""Gate 2: Proactive Probing & Clarification Loop with LLM-generated questions."""
+"""Gate 2: Sondagem Proativa e Loop de Esclarecimento com perguntas geradas por LLM."""
 
 from __future__ import annotations
 
@@ -8,94 +8,170 @@ from dataclasses import dataclass, field
 from ..agents.base import LLMAgent, LLMConfig, LLMResponse
 from ..config import EMASDEPConfig
 from ..core.types import PipelineContext, PipelineGateID, PipelineState
+from .base import PipelineGate
 
 
 @dataclass
-class ProbingQuestionnaire:
-    questions: list[dict] = field(default_factory=list)
-    ambiguity_score: float = 0.0
+class QuestionarioSondagem:
+    """Questionário de perguntas de esclarecimento geradas pelo ProbingGate."""
+    perguntas: list[dict] = field(default_factory=list)
+    pontuacao_ambiguidade: float = 0.0
 
-    def to_dict(self) -> dict:
+    def para_dicionario(self) -> dict:
+        """Converte o questionário para dicionário para resposta da API."""
         return {
-            "action": "BLOCK_AND_PROBE" if self.ambiguity_score > 0.15 else "PROCEED_TO_DESIGN",
-            "ambiguity_score": self.ambiguity_score,
+            "action": "BLOCK_AND_PROBE" if self.pontuacao_ambiguidade > 0.15 else "PROCEED_TO_DESIGN",
+            "ambiguity_score": self.pontuacao_ambiguidade,
             "threshold_limit": 0.15,
             "reason": "Especificação precisa de esclarecimentos adicionais."
-            if self.ambiguity_score > 0.15
-            else "Spec clarity approved.",
-            "questionnaire": self.questions,
+            if self.pontuacao_ambiguidade > 0.15
+            else "Especificação clara o suficiente.",
+            "questionnaire": self.perguntas,
         }
 
 
-class ProbingGate:
-    def __init__(self, config: EMASDEPConfig | None = None, llm_config: LLMConfig | None = None):
+class ProbingGate(PipelineGate):
+    """Gate de sondagem que avalia a clareza da especificação e gera perguntas em português."""
+
+    def __init__(self, config: EMASDEPConfig | None = None, llm_config: LLMConfig | None = None) -> None:
+        """Inicializa o ProbingGate com configuração e agente LLM."""
+        super().__init__()
         self.config = config or EMASDEPConfig()
         self.llm_config = llm_config
-        self.gate_id = PipelineGateID.PROBING
+
+    @property
+    def gate_id(self) -> PipelineGateID:
+        return PipelineGateID.PROBING
+
+    @property
+    def name(self) -> str:
+        return "Sondagem Proativa e Esclarecimento"
 
     async def process(self, ctx: PipelineContext) -> PipelineContext:
+        """Processa o contexto executando a avaliação de clareza da especificação."""
         if not ctx.spec:
             return ctx
 
-        result = await self.evaluate_spec_clarity(ctx.spec)
-        if result["action"] == "BLOCK_AND_PROBE":
+        ctx.current_gate = self.gate_id
+        ctx.telemetry.pipeline_gate = self.name
+        resultado = await self.avaliar_clareza_especificacao(ctx.spec)
+        if resultado["action"] == "BLOCK_AND_PROBE":
             ctx.current_state = PipelineState.BLOCKED_PROBE
         return ctx
 
-    async def evaluate_spec_clarity(self, spec: dict) -> dict:
-        questionnaire = ProbingQuestionnaire()
+    async def avaliar_clareza_especificacao(self, spec: dict) -> dict:
+        """Avalia a clareza da especificação e retorna perguntas de esclarecimento em português."""
+        questionario = QuestionarioSondagem()
 
         if not isinstance(spec, dict):
-            return questionnaire.to_dict()
+            return questionario.para_dicionario()
 
         if self.llm_config and self.llm_config.provider.name != "MOCK":
-            questions = await self._llm_generate_questions(spec)
-            if questions:
-                questionnaire.questions = questions
-                questionnaire.ambiguity_score = len(questions) / 5.0
-                return questionnaire.to_dict()
+            perguntas = await self._gerar_perguntas_llm(spec)
+            if perguntas:
+                perguntas_validas = await self._validar_coerencia(perguntas, spec)
+                if perguntas_validas:
+                    questionario.perguntas = perguntas_validas
+                    questionario.pontuacao_ambiguidade = len(perguntas_validas) / 5.0
+                    return questionario.para_dicionario()
 
-        return questionnaire.to_dict()
+        return questionario.para_dicionario()
 
-    async def _llm_generate_questions(self, spec: dict) -> list[dict]:
-        agent = _ProbingAgent(config=self.llm_config)
+    async def _validar_coerencia(self, perguntas: list[dict], spec: dict) -> list[dict]:
+        """Valida se cada pergunta gerada é coerente com a especificação usando o próprio LLM."""
+        if not perguntas:
+            return []
+
+        try:
+            validador = _ProbingAgent(config=self.llm_config)
+            prompt_validacao = (
+                f"Você é um analista de requisitos. Analise as perguntas de esclarecimento "
+                f"geradas para a seguinte especificação e REMOVA qualquer pergunta que:\n"
+                f"- JÁ seja respondida claramente pela especificação\n"
+                f"- Seja irrelevante para o domínio do problema\n"
+                f"- Esteja duplicada ou muito similar a outra pergunta\n"
+                f"- Use linguagem muito técnica incompatível com o contexto\n\n"
+                f"Especificação:\n{json.dumps(spec, indent=2, ensure_ascii=False)[:3000]}\n\n"
+                f"Perguntas geradas:\n{json.dumps(perguntas, indent=2, ensure_ascii=False)}\n\n"
+                "Retorne APENAS um array JSON válido com as perguntas que passaram na validação. "
+                "Se nenhuma passar, retorne []."
+            )
+            resposta: LLMResponse = await validador.call(
+                prompt=prompt_validacao,
+                system_prompt="Você é um validador de perguntas de esclarecimento. Retorne APENAS JSON válido.",
+            )
+            dados = json.loads(resposta.content)
+            if isinstance(dados, list):
+                return dados
+            return perguntas
+        except (json.JSONDecodeError, Exception):
+            return perguntas
+
+    async def _gerar_perguntas_llm(self, spec: dict) -> list[dict]:
+        """Gera perguntas de esclarecimento em português usando o LLM."""
+        agente = _ProbingAgent(config=self.llm_config)
+        examples_good = (
+            '- Qual o porte esperado do sistema (quantas entidades/features)?\n'
+            '- O sistema precisa de autenticacao e controle de acesso?\n'
+            '- Ha requisitos de escalabilidade ou desempenho esperados?\n'
+            '- O sistema sera integrado com outros sistemas existentes?\n'
+        )
+        examples_bad = (
+            '- O campo X deve ser obrigatorio?\n'
+            '- Qual o tipo de dado do atributo Y?\n'
+            '- A interface Z deve ter paginacao?\n'
+        )
         prompt = (
-            f"Analyze this software specification and generate probing questions "
-            f"to clarify ambiguities. For each missing or unclear field, provide a "
-            f"question with 4-5 concrete numbered options that make sense for this project.\n\n"
-            f"Specification:\n{json.dumps(spec, indent=2, ensure_ascii=False)}\n\n"
-            "Output a JSON array of objects. Each object:\n"
+            "Analise a seguinte especificacao de software em portugues e gere "
+            "perguntas MACRO de esclarecimento. Pergunte sobre decisoes "
+            "arquiteturais de alto nivel, escopo do projeto, restricoes gerais "
+            "e objetivos de negocio. Nao pergunte sobre campos especificos, "
+            "detalhes de implementacao ou interfaces tecnicas.\n\n"
+            "Exemplos de perguntas macro adequadas:\n"
+            f"{examples_good}\n"
+            "Exemplos de perguntas EVITAR (muito detalhadas):\n"
+            f"{examples_bad}\n"
+            f"Especificacao:\n{json.dumps(spec, indent=2, ensure_ascii=False)}\n\n"
+            "Retorne um array JSON de objetos. Cada objeto:\n"
             "{\n"
-            '  "id": "q_01_unique_id",\n'
-            '  "context": "short context label",\n'
-            '  "question": "clear question text",\n'
-            '  "options": [{"label": "1. Option text", "value": "option_value"}, ...]\n'
+            '  "id": "q_01_id_unico",\n'
+            '  "context": "rotulo curto (ex: Escopo, Arquitetura, Seguranca)",\n'
+            '  "question": "pergunta macro em portugues",\n'
+            '  "options": [{"label": "1. Opcao concisa", "value": "valor_opcao"}, ...]\n'
             "}\n\n"
-            "Rules:\n"
-            "- Only ask about MISSING or UNCLEAR fields\n"
-            "- Each question MUST have 4-5 numbered options that are relevant to the spec\n"
-            "- Include a 'Custom' option (value: 'other') as the last option\n"
-            "- Max 7 questions. Output ONLY valid JSON array."
+            "Regras:\n"
+            "- APENAS perguntas MACRO sobre visao geral, escopo, restricoes\n"
+            "- Cada pergunta DEVE ter 3-4 opcoes concisas\n"
+            "- Gere a quantidade necessaria de perguntas (sem maximo fixo)\n"
+            "- Use portugues claro e direto\n"
+            "- Retorne APENAS o array JSON valido, sem texto adicional"
         )
         try:
-            response: LLMResponse = await agent.call(
+            resposta: LLMResponse = await agente.call(
                 prompt=prompt,
-                system_prompt=agent.build_system_prompt(),
+                system_prompt=agente.construir_prompt_sistema(),
             )
-            data = json.loads(response.content)
-            if isinstance(data, list):
-                return data
-            if isinstance(data, dict) and "questions" in data:
-                return data["questions"]
+            dados = json.loads(resposta.content)
+            if isinstance(dados, list):
+                return dados
+            if isinstance(dados, dict) and "questions" in dados:
+                return dados["questions"]
             return []
         except (json.JSONDecodeError, Exception):
             return []
 
 
 class _ProbingAgent(LLMAgent):
-    def build_system_prompt(self) -> str:
+    """Agente LLM especializado em gerar perguntas de esclarecimento em português."""
+
+    def construir_prompt_sistema(self) -> str:
+        """Constrói o prompt de sistema para o agente de sondagem."""
         return (
-            "You are a Requirements Analyst. "
-            "Analyze specifications for ambiguities and generate clarifying questions "
-            "with relevant numbered options. Output ONLY valid JSON."
+            "Você é um Analista de Requisitos sênior especializado em esclarecer "
+            "especificações de software. Gere perguntas objetivas em português com "
+            "opções relevantes para resolver ambiguidades. Retorne APENAS JSON válido."
         )
+
+    def build_system_prompt(self) -> str:
+        """Mantido para compatibilidade com a interface LLMAgent."""
+        return self.construir_prompt_sistema()

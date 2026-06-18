@@ -11,10 +11,14 @@ from ..core.types import SpecContract
 
 
 class PMAgent(LLMAgent):
-    def __init__(self, config: LLMConfig | None = None):
+    def __init__(self, config: LLMConfig | None = None) -> None:
         super().__init__(config)
 
     def build_system_prompt(self) -> str:
+        """build system prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         return (
             "You are a Formal Contract Engine. "
             "Translate raw business intent into a strictly typed SpecContract JSON. "
@@ -22,6 +26,13 @@ class PMAgent(LLMAgent):
         )
 
     async def generate_spec(self, raw_intent: str) -> SpecContract:
+        """generate spec.
+
+Args:
+    raw_intent: Descrição do parâmetro raw_intent.
+
+Retorna:
+    Descrição do valor retornado."""
         response: LLMResponse = await self.call(
             prompt=(
                 f"Raw intent: {raw_intent}\n\n"
@@ -53,6 +64,14 @@ class PMAgent(LLMAgent):
         return self._normalize_spec(spec_data, raw_intent)
 
     def _normalize_spec(self, spec: Any, raw_intent: str) -> SpecContract:
+        """ normalize spec.
+
+Args:
+    spec: Descrição do parâmetro spec.
+    raw_intent: Descrição do parâmetro raw_intent.
+
+Retorna:
+    Descrição do valor retornado."""
         if not isinstance(spec, dict):
             return self._build_default_spec(raw_intent)
 
@@ -73,6 +92,13 @@ class PMAgent(LLMAgent):
         return spec
 
     def _build_default_spec(self, raw_intent: str) -> SpecContract:
+        """ build default spec.
+
+Args:
+    raw_intent: Descrição do parâmetro raw_intent.
+
+Retorna:
+    Descrição do valor retornado."""
         return {
             "spec_version": "3.0.0",
             "security_clearance": "enterprise-restricted",

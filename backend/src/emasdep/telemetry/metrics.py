@@ -17,10 +17,19 @@ class MetricPoint:
 
 
 class MetricsCollector:
-    def __init__(self):
+    def __init__(self) -> None:
         self._points: list[MetricPoint] = []
 
-    def record(self, name: str, value: float, labels: dict[str, str] | None = None):
+    def record(self, name: str, value: float, labels: dict[str, str] | None = None) -> None:
+        """record.
+
+Args:
+    name: Descrição do parâmetro name.
+    value: Descrição do parâmetro value.
+    labels: Descrição do parâmetro labels.
+
+Retorna:
+    Descrição do valor retornado."""
         self._points.append(
             MetricPoint(name=name, value=value, labels=labels or {})
         )
@@ -32,6 +41,7 @@ class MetricsCollector:
         mutation_score: float,
         coverage: float,
     ) -> dict[str, Any]:
+        """retorna métricas agregadas do pipeline."""
         return {
             "latency_duration_ms": latency_ms,
             "financial_token_cost_usd": round(token_cost, 6),
@@ -40,6 +50,10 @@ class MetricsCollector:
         }
 
     def summarize(self) -> dict[str, float]:
+        """summarize.
+
+Retorna:
+    Descrição do valor retornado."""
         summary: dict[str, float] = {}
         for point in self._points:
             if point.name not in summary:
@@ -47,5 +61,5 @@ class MetricsCollector:
             summary[point.name] += point.value
         return summary
 
-    def clear(self):
+    def clear(self) -> None:
         self._points.clear()

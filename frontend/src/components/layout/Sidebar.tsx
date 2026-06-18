@@ -1,8 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
-  GitBranch,
-  BarChart3,
   Settings,
   Zap,
   type LucideIcon,
@@ -17,8 +15,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Pipeline', path: '/pipeline', icon: GitBranch },
-  { label: 'Telemetry', path: '/telemetry', icon: BarChart3 },
   { label: 'Settings', path: '/settings', icon: Settings },
 ];
 

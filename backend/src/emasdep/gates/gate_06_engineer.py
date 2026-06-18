@@ -23,7 +23,8 @@ class EngineerGate(PipelineGate):
         self,
         agent: EngineerAgent | None = None,
         healing_engine: HealingEngine | None = None,
-    ):
+    ) -> None:
+        """inicializa o gate de engenharia."""
         self._agent = agent or EngineerAgent()
         self._healing = healing_engine or HealingEngine()
 
@@ -36,6 +37,13 @@ class EngineerGate(PipelineGate):
         return "Sandboxed Code Generation"
 
     async def process(self, ctx: PipelineContext) -> PipelineContext:
+        """process.
+
+Args:
+    ctx: Descrição do parâmetro ctx.
+
+Retorna:
+    Descrição do valor retornado."""
         if not ctx.task_dag:
             ctx.failure_reason = "No task DAG available"
             ctx.current_state = PipelineState.FAILED
@@ -67,27 +75,32 @@ class EngineerGate(PipelineGate):
             for task, result in zip(independent, results):
                 if isinstance(result, Exception):
                     ctx.failure_reason = f"Task {task.task_id} failed: {result}"
-                    ctx.current_state = PipelineState.HEALING_LOOP
-                    ctx.current_gate = self.gate_id
-                    return ctx
-                if result is not None:
+                elif result is not None:
                     ctx.code_artifacts[task.task_id] = result
 
         for task in dependent:
             code = await self._execute_task(task, spec_dict, test_suite, ctx)
             if code is None:
                 ctx.failure_reason = f"Task {task.task_id} failed after healing attempts"
-                ctx.current_state = PipelineState.HEALING_LOOP
-                ctx.current_gate = self.gate_id
-                return ctx
-            ctx.code_artifacts[task.task_id] = code
+            else:
+                ctx.code_artifacts[task.task_id] = code
 
-        ctx.current_state = PipelineState.CODING
+        ctx.current_state = PipelineState.CODING if ctx.code_artifacts else PipelineState.HEALING_LOOP
         ctx.current_gate = self.gate_id
         ctx.telemetry.pipeline_gate = self.name
         return ctx
 
     async def _execute_task(self, task, spec_dict: dict, test_suite: str, ctx: PipelineContext) -> str | None:
+        """ execute task.
+
+Args:
+    task: Descrição do parâmetro task.
+    spec_dict: Descrição do parâmetro spec_dict.
+    test_suite: Descrição do parâmetro test_suite.
+    ctx: Descrição do parâmetro ctx.
+
+Retorna:
+    Descrição do valor retornado."""
         import time
         breaker = CircuitBreaker(self.gate_id)
         start_ms = int(time.time() * 1000)
@@ -100,7 +113,7 @@ class EngineerGate(PipelineGate):
             heal_result = await self._healing.attempt_heal(
                 filepath=filepath,
                 code_content=code,
-                test_command=f"pytest -x tests/",
+                test_command="pytest -x tests/",
                 test_content=test_suite,
             )
 

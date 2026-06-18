@@ -9,10 +9,14 @@ from ..core.types import SpecContract
 
 
 class ArchitectAgent(LLMAgent):
-    def __init__(self, config: LLMConfig | None = None):
+    def __init__(self, config: LLMConfig | None = None) -> None:
         super().__init__(config)
 
     def build_system_prompt(self) -> str:
+        """build system prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         return (
             "You are an Architectural Guard. "
             "Construct rigorous System Design Documents (SDD) enforcing "
@@ -20,6 +24,13 @@ class ArchitectAgent(LLMAgent):
         )
 
     async def generate_sdd(self, spec: SpecContract) -> str:
+        """generate sdd.
+
+Args:
+    spec: Descrição do parâmetro spec.
+
+Retorna:
+    Descrição do valor retornado."""
         response: LLMResponse = await self.call(
             prompt=(
                 f"Specification:\n{json.dumps(spec, indent=2)}\n\n"

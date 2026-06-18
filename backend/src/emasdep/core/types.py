@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from datetime import timezone as tz
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, TypedDict
@@ -191,10 +190,20 @@ class CodePatchSnapshot:
     original_contents: str
     crash_log: str
     failure_category: FailureCategory = FailureCategory.UNKNOWN
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
     def create(cls, filepath: Path, contents: str, crash_log: str = "", failure_category: FailureCategory = FailureCategory.UNKNOWN) -> CodePatchSnapshot:
+        """create.
+
+Args:
+    filepath: Descrição do parâmetro filepath.
+    contents: Descrição do parâmetro contents.
+    crash_log: Descrição do parâmetro crash_log.
+    failure_category: Descrição do parâmetro failure_category.
+
+Retorna:
+    Descrição do valor retornado."""
         return cls(
             state_id=f"snap_{uuid.uuid4().hex[:12]}",
             target_filepath=filepath,
@@ -318,10 +327,19 @@ class MemoryEntry:
     content: str
     metadata: dict = field(default_factory=dict)
     embedding: list[float] | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
     def create(cls, entry_type: str, content: str, metadata: dict | None = None) -> MemoryEntry:
+        """create.
+
+Args:
+    entry_type: Descrição do parâmetro entry_type.
+    content: Descrição do parâmetro content.
+    metadata: Descrição do parâmetro metadata.
+
+Retorna:
+    Descrição do valor retornado."""
         return cls(
             id=f"mem_{uuid.uuid4().hex[:12]}",
             entry_type=entry_type,
@@ -367,6 +385,10 @@ class PipelineContext:
     version: int = 0
 
     def increment_version(self) -> int:
+        """increment version.
+
+Retorna:
+    Descrição do valor retornado."""
         self.version += 1
         return self.version
 

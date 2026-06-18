@@ -11,6 +11,10 @@ router = APIRouter()
 
 
 def _get_env() -> dict[str, str]:
+    """ get env.
+
+Retorna:
+    Descrição do valor retornado."""
     return {
         "EMASDEP_LLM_PROVIDER": os.environ.get("EMASDEP_LLM_PROVIDER", "ollama"),
         "EMASDEP_LLM_MODEL": os.environ.get("EMASDEP_LLM_MODEL", "llama3.2:1b"),
@@ -22,6 +26,13 @@ def _get_env() -> dict[str, str]:
 
 
 def _mask_key(key: str) -> str:
+    """ mask key.
+
+Args:
+    key: Descrição do parâmetro key.
+
+Retorna:
+    Descrição do valor retornado."""
     if len(key) <= 8:
         return key
     return key[:4] + "*" * (len(key) - 8) + key[-4:]
@@ -29,6 +40,10 @@ def _mask_key(key: str) -> str:
 
 @router.get("/api/config/ollama-models")
 async def list_ollama_models():
+    """list ollama models.
+
+Retorna:
+    None"""
     import httpx
     base = os.environ.get("EMASDEP_LLM_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
     try:
@@ -42,6 +57,10 @@ async def list_ollama_models():
 
 @router.get("/api/config")
 async def get_config():
+    """get config.
+
+Retorna:
+    None"""
     env = _get_env()
     raw_key = os.environ.get("EMASDEP_LLM_API_KEY", "")
     env["EMASDEP_LLM_API_KEY"] = _mask_key(raw_key) if raw_key else ""
@@ -50,6 +69,13 @@ async def get_config():
 
 @router.post("/api/config/test")
 async def test_config(body: dict[str, Any]):
+    """test config.
+
+Args:
+    body: Descrição do parâmetro body.
+
+Retorna:
+    None"""
     import httpx
     provider = body.get("EMASDEP_LLM_PROVIDER", os.environ.get("EMASDEP_LLM_PROVIDER", "ollama"))
     base_url = body.get("EMASDEP_LLM_BASE_URL", os.environ.get("EMASDEP_LLM_BASE_URL", ""))
@@ -119,6 +145,13 @@ async def test_config(body: dict[str, Any]):
 
 @router.put("/api/config")
 async def update_config(body: dict[str, Any]):
+    """update config.
+
+Args:
+    body: Descrição do parâmetro body.
+
+Retorna:
+    None"""
     allowed_keys = {
         "EMASDEP_LLM_PROVIDER",
         "EMASDEP_LLM_MODEL",

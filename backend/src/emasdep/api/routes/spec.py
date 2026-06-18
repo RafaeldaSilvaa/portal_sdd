@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...core.types import SpecContract
 from ..db.base import get_db
 from ..models.pipeline import PipelineRun
 
@@ -15,6 +14,14 @@ class SpecUpdateRequest(BaseModel):
 
 @router.get("/{correlation_id}")
 async def get_spec(correlation_id: str, db: Session = Depends(get_db)):
+    """get spec.
+
+Args:
+    correlation_id: Descrição do parâmetro correlation_id.
+    db: Descrição do parâmetro db.
+
+Retorna:
+    None"""
     run = db.query(PipelineRun).filter_by(correlation_id=correlation_id).first()
     if not run:
         raise HTTPException(404, "Pipeline run not found")
@@ -23,6 +30,15 @@ async def get_spec(correlation_id: str, db: Session = Depends(get_db)):
 
 @router.put("/{correlation_id}")
 async def update_spec(correlation_id: str, req: SpecUpdateRequest, db: Session = Depends(get_db)):
+    """update spec.
+
+Args:
+    correlation_id: Descrição do parâmetro correlation_id.
+    req: Descrição do parâmetro req.
+    db: Descrição do parâmetro db.
+
+Retorna:
+    None"""
     run = db.query(PipelineRun).filter_by(correlation_id=correlation_id).first()
     if not run:
         raise HTTPException(404, "Pipeline run not found")

@@ -19,7 +19,8 @@ class ConvergenceGate(PipelineGate):
         coverage_tracker: CoverageTracker | None = None,
         mutation_validator: MutationValidator | None = None,
         llm_config: LLMConfig | None = None,
-    ):
+    ) -> None:
+        """inicializa o gate de convergência com validação e LLM-as-Judge."""
         self._ast = ast_validator or ASTValidator()
         self._coverage = coverage_tracker or CoverageTracker()
         self._mutation = mutation_validator or MutationValidator()
@@ -34,6 +35,13 @@ class ConvergenceGate(PipelineGate):
         return "Cryptographic Convergence"
 
     async def process(self, ctx: PipelineContext) -> PipelineContext:
+        """process.
+
+Args:
+    ctx: Descrição do parâmetro ctx.
+
+Retorna:
+    Descrição do valor retornado."""
         ctx.current_gate = self.gate_id
         ctx.current_state = PipelineState.VALIDATION
         ctx.telemetry.pipeline_gate = self.name
@@ -48,7 +56,8 @@ class ConvergenceGate(PipelineGate):
                 break
 
         coverage_result = await self._coverage.measure(
-            list(ctx.code_artifacts.values())
+            list(ctx.code_artifacts.values()),
+            test_suite=ctx.test_suite or "",
         )
 
         mutation_result = await self._mutation.validate(
@@ -115,7 +124,14 @@ class ConvergenceGate(PipelineGate):
         return ctx
 
     async def _llm_judge(self, ctx: PipelineContext) -> float | None:
-        from ..agents.base import LLMAgent, LLMResponse
+        """ llm judge.
+
+Args:
+    ctx: Descrição do parâmetro ctx.
+
+Retorna:
+    Descrição do valor retornado."""
+        from ..agents.base import LLMResponse
 
         spec_str = str(ctx.spec)
         sample_code = ""

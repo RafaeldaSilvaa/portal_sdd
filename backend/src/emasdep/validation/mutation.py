@@ -5,14 +5,13 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..core.types import MutationResult
 
 
 class MutationValidator:
-    def __init__(self, min_score: float = 0.85):
+    def __init__(self, min_score: float = 0.85) -> None:
         self.min_score = min_score
 
     async def validate(
@@ -32,6 +31,14 @@ class MutationValidator:
         return await self._run_mutmut(code_artifacts, test_suite)
 
     async def _run_mutmut(self, code_artifacts: dict, test_suite: str) -> MutationResult:
+        """ run mutmut.
+
+Args:
+    code_artifacts: Descrição do parâmetro code_artifacts.
+    test_suite: Descrição do parâmetro test_suite.
+
+Retorna:
+    Descrição do valor retornado."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             src_dir = tmp_path / "src"
@@ -62,6 +69,14 @@ class MutationValidator:
             return self._parse_mutmut_output(result.stdout, result.returncode)
 
     def _parse_mutmut_output(self, output: str, returncode: int) -> MutationResult:
+        """ parse mutmut output.
+
+Args:
+    output: Descrição do parâmetro output.
+    returncode: Descrição do parâmetro returncode.
+
+Retorna:
+    Descrição do valor retornado."""
         import re
 
         score_match = re.search(r"(\d+\.\d+)\%", output)
@@ -80,6 +95,14 @@ class MutationValidator:
         )
 
     async def analyze_mutation_weaknesses(self, code: str, tests: str) -> list[str]:
+        """analyze mutation weaknesses.
+
+Args:
+    code: Descrição do parâmetro code.
+    tests: Descrição do parâmetro tests.
+
+Retorna:
+    Descrição do valor retornado."""
         result = await self._run_mutmut({"target.py": code}, tests)
 
         weaknesses: list[str] = []

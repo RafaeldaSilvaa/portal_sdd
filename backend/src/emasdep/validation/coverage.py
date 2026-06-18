@@ -9,10 +9,18 @@ from pathlib import Path
 
 
 class CoverageTracker:
-    def __init__(self, min_coverage: float = 0.95):
+    def __init__(self, min_coverage: float = 0.95) -> None:
         self.min_coverage = min_coverage
 
-    async def measure(self, code_artifacts: list[str]) -> float:
+    async def measure(self, code_artifacts: list[str], test_suite: str = "") -> float:
+        """measure.
+
+Args:
+    code_artifacts: Descrição do parâmetro code_artifacts.
+    test_suite: Descrição do parâmetro test_suite.
+
+Retorna:
+    Descrição do valor retornado."""
         if not code_artifacts:
             return 0.0
 
@@ -27,9 +35,11 @@ class CoverageTracker:
             for i, code in enumerate(code_artifacts):
                 (src_dir / f"module_{i}.py").write_text(code, encoding="utf-8")
 
-            cov_file = tmp_path / ".coverage"
+            if test_suite:
+                (test_dir / "test_generated.py").write_text(test_suite, encoding="utf-8")
+
             env = {**os.environ, "PYTHONPATH": str(src_dir)}
-            proc = subprocess.run(
+            subprocess.run(
                 [
                     "python", "-m", "coverage", "run",
                     "--source", str(src_dir),
@@ -53,6 +63,13 @@ class CoverageTracker:
             return self._parse_coverage(report_proc.stdout)
 
     def _parse_coverage(self, report: str) -> float:
+        """ parse coverage.
+
+Args:
+    report: Descrição do parâmetro report.
+
+Retorna:
+    Descrição do valor retornado."""
         for line in report.strip().split("\n"):
             parts = line.split()
             if len(parts) >= 4:

@@ -8,10 +8,14 @@ from .base import LLMAgent, LLMConfig, LLMResponse
 
 
 class QAAgent(LLMAgent):
-    def __init__(self, config: LLMConfig | None = None):
+    def __init__(self, config: LLMConfig | None = None) -> None:
         super().__init__(config)
 
     def build_system_prompt(self) -> str:
+        """build system prompt.
+
+Retorna:
+    Descrição do valor retornado."""
         return (
             "You are an Adversarial Mutator. "
             "Generate rigorous pytest tests using AAA (Arrange, Act, Assert). "
@@ -19,6 +23,14 @@ class QAAgent(LLMAgent):
         )
 
     async def generate_tests(self, spec: dict, sdd: str) -> str:
+        """generate tests.
+
+Args:
+    spec: Descrição do parâmetro spec.
+    sdd: Descrição do parâmetro sdd.
+
+Retorna:
+    Descrição do valor retornado."""
         response: LLMResponse = await self.call(
             prompt=(
                 f"Spec: {json.dumps(spec, indent=2)[:2000]}\nSDD: {sdd[:2000]}\n\n"

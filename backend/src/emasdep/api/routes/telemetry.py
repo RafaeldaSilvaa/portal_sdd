@@ -3,13 +3,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from ..db.base import get_db
-from ..models.pipeline import PipelineRun, TelemetryRecord
+from ..models.pipeline import PipelineRun
 
 router = APIRouter(prefix="/api/telemetry", tags=["telemetry"])
 
 
 @router.get("/stats")
 async def get_telemetry_stats(db: Session = Depends(get_db)):
+    """get telemetry stats.
+
+Args:
+    db: Descrição do parâmetro db.
+
+Retorna:
+    None"""
     total_runs = db.query(func.count(PipelineRun.id)).scalar() or 0
     converged = db.query(func.count(PipelineRun.id)).filter_by(is_converged=True).scalar() or 0
     failed = (

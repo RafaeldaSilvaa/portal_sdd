@@ -14,7 +14,14 @@ logger = logging.getLogger("emasdep.telemetry")
 
 
 class PipelineTracer:
-    def __init__(self, output_path: str = "./.emasdep_traces"):
+    def __init__(self, output_path: str = "./.emasdep_traces") -> None:
+        """  init  .
+
+Args:
+    output_path: Descrição do parâmetro output_path.
+
+Retorna:
+    Descrição do valor retornado."""
         self._path = Path(output_path)
         self._path.mkdir(parents=True, exist_ok=True)
 
@@ -50,12 +57,23 @@ class PipelineTracer:
         return event_id
 
     def get_trace_events(self, trace_id: str) -> list[dict]:
+        """get trace events.
+
+Args:
+    trace_id: Descrição do parâmetro trace_id.
+
+Retorna:
+    Descrição do valor retornado."""
         events: list[dict] = []
         for f in sorted(self._path.glob(f"{trace_id}_*.json")):
             events.append(json.loads(f.read_text(encoding="utf-8")))
         return events
 
     def get_all_trace_ids(self) -> list[str]:
+        """get all trace ids.
+
+Retorna:
+    Descrição do valor retornado."""
         trace_ids: set[str] = set()
         for f in self._path.glob("*.json"):
             try:
