@@ -49,8 +49,7 @@ Retorna:
     if run.code_artifacts:
         try:
             artifacts = json.loads(run.code_artifacts)
-            for i, (task_id, code) in enumerate(artifacts.items(), 1):
-                fname = f"task_{i}.py"
+            for fname, code in artifacts.items():
                 children.append(FileEntry(name=fname, path=f"src/{fname}", type="file", size=len(code)))
         except (json.JSONDecodeError, AttributeError):
             pass
@@ -84,12 +83,9 @@ Retorna:
     if path.startswith("src/") and run.code_artifacts:
         try:
             artifacts = json.loads(run.code_artifacts)
-            parts = path.split("/")
-            fname = parts[-1]
-            idx = int(fname.replace("task_", "").replace(".py", "")) - 1 if fname.startswith("task_") else -1
-            if 0 <= idx < len(artifacts):
-                return list(artifacts.values())[idx]
-        except (json.JSONDecodeError, ValueError, IndexError):
+            fname = path.split("/", 1)[1]
+            return artifacts.get(fname)
+        except (json.JSONDecodeError, ValueError):
             pass
     return None
 
@@ -151,8 +147,8 @@ Retorna:
         if run.code_artifacts:
             try:
                 artifacts = json.loads(run.code_artifacts)
-                for i, (task_id, code) in enumerate(artifacts.items(), 1):
-                    entries.append((f"src/task_{i}.py", code))
+                for fname, code in artifacts.items():
+                    entries.append((f"src/{fname}", code))
             except (json.JSONDecodeError, AttributeError):
                 pass
         for path, content in entries:

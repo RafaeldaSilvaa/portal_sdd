@@ -47,9 +47,9 @@ services:
       - "8000:8000"
     environment:
       - EMASDEP_DATABASE_URL=postgresql://emasdep:emasdep@db:5432/emasdep
-      - EMASDEP_LLM_PROVIDER=ollama
-      - EMASDEP_LLM_MODEL=llama3.2:1b
-      - EMASDEP_LLM_BASE_URL=http://ollama:11434
+      - EMASDEP_LLM_PROVIDER=OpenAI Compatible
+      - EMASDEP_LLM_MODEL=deepseek-v4-flash
+      - EMASDEP_LLM_BASE_URL=https://api.deepseek.com
       - EMASDEP_LLM_TEMPERATURE=0.0
       - EMASDEP_LLM_MAX_TOKENS=8192
       - EMASDEP_ENV=production

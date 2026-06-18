@@ -281,9 +281,8 @@ async def _run_remaining_gates(
                 ctx.telemetry.total_latency_ms += latency
 
                 if gate_id == PipelineGateID.ENGINEER and ctx.code_artifacts:
-                    for task_id, code in ctx.code_artifacts.items():
-                        fname = f"src/{task_id}.py"
-                        _log(f"Generated {fname} ({len(code)} bytes)", gate=gate_name)
+                    for fname, code in ctx.code_artifacts.items():
+                        _log(f"Generated src/{fname} ({len(code)} bytes)", gate=gate_name)
                     run.code_artifacts = json.dumps(ctx.code_artifacts)
                     memory.store_episodic(cid, f"Generated {len(ctx.code_artifacts)} files", failed=False)
 

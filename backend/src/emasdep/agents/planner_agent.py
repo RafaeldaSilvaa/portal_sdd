@@ -38,11 +38,15 @@ Retorna:
             prompt=(
                 f"SDD:\n{sdd[:3000]}\n\n"
                 "Generate JSON array of tasks:\n"
-                "- task_id: string\n"
+                "- task_id: short unique id (e.g. user_repo, create_user, user_controller)\n"
                 "- description: string\n"
                 "- dependencies: list of task_ids\n"
                 "- agent_role: 'engineer' | 'qa'\n"
-                "- target_files: list\n"
+                "- target_files: list of meaningful file paths reflecting the architecture "
+                "(e.g. domain/entities/user.py, application/usecases/create_user.py, "
+                "infrastructure/repositories/user_repository.py, "
+                "presentation/controllers/user_controller.py, "
+                "main/config.py)\n"
                 "- estimated_complexity: 1-5"
             ),
             system_prompt=self.build_system_prompt(),

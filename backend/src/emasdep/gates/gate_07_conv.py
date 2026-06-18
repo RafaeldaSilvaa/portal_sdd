@@ -48,7 +48,7 @@ Retorna:
 
         ast_clean = True
         for filename, content in ctx.code_artifacts.items():
-            basic = self._ast.validate(content)
+            basic = self._ast.validate_detailed(content)
             ruff = self._ast.validate_with_ruff(content)
             mypy = self._ast.validate_with_mypy(content)
             if not (basic.is_valid and ruff.is_valid and mypy.is_valid):
