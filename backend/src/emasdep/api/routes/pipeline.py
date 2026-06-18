@@ -1,19 +1,24 @@
 import asyncio
 import json
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...agents.base import LLMConfig
+from ...agents.orchestrator_agent import OrchestratorAgent
 from ...core.types import (
+    AgentTraceEntry,
     PipelineContext,
     PipelineState,
     PipelineGateID,
 )
+from ...core.token_optimizer import TokenOptimizer
 from ...gates.gate_01_spec import SpecGate
 from ...gates.gate_02_probing import ProbingGate
 from ...gates.gate_03_arch import ArchitectureGate
+from ...gates.gate_45_risk import RiskAnalysisGate
 from ...gates.gate_04_planner import PlannerGate
 from ...gates.gate_05_qa import QAGate
 from ...gates.gate_06_engineer import EngineerGate
@@ -23,6 +28,8 @@ from ...agents.planner_agent import PlannerAgent
 from ...agents.qa_agent import QAAgent
 from ...agents.engineer_agent import EngineerAgent
 from ...agents.pm_agent import PMAgent
+from ...validation.guardrails import Guardrails
+from ...memory.rag_memory import get_memory
 from ..db.base import get_db
 from ..models.pipeline import PipelineRun, ProbingQuestion
 from ..pipeline_logs import add_log, get_logs
@@ -54,6 +61,7 @@ class PipelineStatusResponse(BaseModel):
     spec: dict | None
     probing_questions: list[dict] | None
     sdd: str | None
+    risk_analysis: dict | None
     task_count: int | None
     mutation_score: float | None
     coverage_percent: float | None
@@ -61,15 +69,30 @@ class PipelineStatusResponse(BaseModel):
     is_converged: bool
     is_cancelled: bool
     interaction_pending: str | None
+    total_latency_ms: int | None
+    total_tokens: int | None
+    agent_trace: list[dict] | None
 
 
 GATE_NAMES = {
     PipelineGateID.ARCHITECTURE: "Architecture",
+    PipelineGateID.RISK_ANALYSIS: "RiskAnalysis",
     PipelineGateID.PLANNER: "Planner",
     PipelineGateID.QA: "QA",
     PipelineGateID.ENGINEER: "Engineer",
     PipelineGateID.CONVERGENCE: "Convergence",
 }
+
+ALL_GATES = [
+    PipelineGateID.ARCHITECTURE,
+    PipelineGateID.RISK_ANALYSIS,
+    PipelineGateID.PLANNER,
+    PipelineGateID.QA,
+    PipelineGateID.ENGINEER,
+    PipelineGateID.CONVERGENCE,
+]
+
+_token_optimizer = TokenOptimizer()
 
 
 async def _run_full_pipeline(cid: str, raw_intent: str, db_url: str):
@@ -78,37 +101,41 @@ async def _run_full_pipeline(cid: str, raw_intent: str, db_url: str):
     from emasdep.api.db.base import SessionLocal
 
     db = SessionLocal()
+    memory = get_memory()
     try:
         add_log(cid, "Running SpecGate...", gate="SPEC")
         ctx = PipelineContext()
         ctx.correlation_id = cid
-        spec_gate = SpecGate()
-        ctx = await spec_gate.process(ctx)
+        llm_config = LLMConfig.from_env(os.environ)
+        orchestrator = OrchestratorAgent(config=llm_config)
+
+        spec_gate = SpecGate(llm_config=llm_config)
+        ctx = await spec_gate.process(ctx, raw_intent=raw_intent)
 
         run = db.query(PipelineRun).filter_by(correlation_id=cid).first()
         if run:
             run.current_state = ctx.current_state.name
             run.current_gate = ctx.current_gate.value
+            if ctx.spec:
+                run.spec_json = json.dumps(ctx.spec)
             db.commit()
 
-        add_log(cid, f"SpecGate complete — state: {ctx.current_state.name}", gate="SPEC")
-        add_log(cid, "Generating spec via PM Agent...", gate="SPEC")
-
-        llm_config = LLMConfig.from_env(os.environ)
-        pm_agent = PMAgent(config=llm_config)
-        try:
-            spec = await pm_agent.generate_spec(raw_intent)
-            ctx.spec = spec
-            if run:
-                run.spec_json = json.dumps(spec) if spec else None
-                db.commit()
+        if ctx.spec:
             add_log(cid, "Spec generated successfully", gate="SPEC")
-        except Exception as exc:
-            add_log(cid, f"Spec generation failed (using default): {exc}", level="warning", gate="SPEC")
-
+            memory.store_semantic("spec", json.dumps(ctx.spec))
+        else:
+            add_log(cid, "Spec generation failed (using default)", level="warning", gate="SPEC")
+        add_log(cid, f"SpecGate complete — state: {ctx.current_state.name}", gate="SPEC")
         add_log(cid, "Running ProbingGate...", gate="PROBING")
-        probing_gate = ProbingGate()
-        probe_result = probing_gate.evaluate_spec_clarity(raw_intent, ctx.spec or {})
+
+        probing_gate = ProbingGate(llm_config=llm_config)
+        probe_result = await probing_gate.evaluate_spec_clarity(ctx.spec or {})
+
+        guard = Guardrails()
+        gr = guard.check_no_undefined_schema(ctx.spec)
+        if not gr.passed:
+            for v in gr.violations:
+                add_log(cid, f"Guardrail: {v.rule} - {v.detail}", level="warning", gate="GUARDRAILS")
 
         if probe_result["action"] == "BLOCK_AND_PROBE":
             ctx.current_state = PipelineState.BLOCKED_PROBE
@@ -126,7 +153,7 @@ async def _run_full_pipeline(cid: str, raw_intent: str, db_url: str):
             add_log(cid, f"Blocked — {len(probe_result.get('questionnaire', []))} probing questions", gate="PROBING")
         else:
             add_log(cid, "Spec clarity approved, running full pipeline...", gate="PROBING")
-            await _run_remaining_gates(cid, ctx, db)
+            await _run_remaining_gates(cid, ctx, db, llm_config, orchestrator)
 
         run = db.query(PipelineRun).filter_by(correlation_id=cid).first()
         if run and run.current_state not in ("FAILED", "CANCELLED"):
@@ -148,12 +175,25 @@ async def _run_full_pipeline(cid: str, raw_intent: str, db_url: str):
         db.close()
 
 
-async def _run_remaining_gates(cid: str, ctx: PipelineContext | None = None, db: Session | None = None):
+async def _run_remaining_gates(
+    cid: str,
+    ctx: PipelineContext | None = None,
+    db: Session | None = None,
+    llm_config: LLMConfig | None = None,
+    orchestrator: OrchestratorAgent | None = None,
+):
     import os
-    from emasdep.agents.base import LLMConfig
+    from emasdep.agents.base import LLMConfig as _LLMConfig
     from emasdep.api.db.base import SessionLocal
 
-    llm_config = LLMConfig.from_env(os.environ)
+    if llm_config is None:
+        llm_config = _LLMConfig.from_env(os.environ)
+    if orchestrator is None:
+        orchestrator = OrchestratorAgent(config=llm_config)
+
+    memory = get_memory()
+    guard = Guardrails()
+    _probing_gate = ProbingGate(llm_config=llm_config)
     close_db = db is None
     if db is None:
         db = SessionLocal()
@@ -178,10 +218,11 @@ async def _run_remaining_gates(cid: str, ctx: PipelineContext | None = None, db:
 
         gates = [
             (PipelineGateID.ARCHITECTURE, ArchitectureGate(ArchitectAgent(config=llm_config)), "ARCHITECTURE"),
+            (PipelineGateID.RISK_ANALYSIS, RiskAnalysisGate(llm_config=llm_config), "RISK_ANALYSIS"),
             (PipelineGateID.PLANNER, PlannerGate(PlannerAgent(config=llm_config)), "PLANNER"),
             (PipelineGateID.QA, QAGate(QAAgent(config=llm_config)), "QA"),
             (PipelineGateID.ENGINEER, EngineerGate(EngineerAgent(config=llm_config)), "ENGINEER"),
-            (PipelineGateID.CONVERGENCE, ConvergenceGate(), "CONVERGENCE"),
+            (PipelineGateID.CONVERGENCE, ConvergenceGate(llm_config=llm_config), "CONVERGENCE"),
         ]
 
         for gate_id, gate, gate_name in gates:
@@ -190,11 +231,18 @@ async def _run_remaining_gates(cid: str, ctx: PipelineContext | None = None, db:
                 add_log(cid, f"Skipping {gate_name} — pipeline cancelled", level="warning")
                 break
 
+            gr = guard.check_all(ctx)
+            if not gr.passed:
+                for v in gr.violations:
+                    add_log(cid, f"Guardrail: {v.rule} ({v.severity}): {v.detail}", level="warning", gate=gate_name)
+
             add_log(cid, f"Running {gate_name}Gate...", gate=gate_name)
             run.current_gate = gate_id.value
             db.commit()
 
             try:
+                start_ms = int(time.time() * 1000)
+
                 if gate_id == PipelineGateID.ENGINEER and ctx.task_dag:
                     engineer_tasks = [
                         t for t in ctx.task_dag.tasks.values()
@@ -202,28 +250,59 @@ async def _run_remaining_gates(cid: str, ctx: PipelineContext | None = None, db:
                     ]
                     add_log(cid, f"Generating {len(engineer_tasks)} code file(s)...", gate=gate_name)
 
+                if ctx.sdd:
+                    compressed = _token_optimizer.compress(ctx.sdd, preserve_sections=["domain_model"])
+                    if compressed.compressed_length < compressed.original_length:
+                        add_log(cid, f"SDD compressed: {compressed.original_length}→{compressed.compressed_length} chars", gate=gate_name)
+
                 ctx = await gate.process(ctx)
+                latency = int(time.time() * 1000) - start_ms
                 run.current_state = ctx.current_state.name
+
+                ctx.telemetry.agent_trace.append(AgentTraceEntry(
+                    agent_role=gate_name.lower(),
+                    gate=gate_name,
+                    latency_ms=latency,
+                    token_usage=len(str(ctx.spec or "")) + len(ctx.sdd or ""),
+                    status="success" if ctx.current_state != PipelineState.FAILED else "error",
+                ))
+                ctx.telemetry.total_latency_ms += latency
 
                 if gate_id == PipelineGateID.ENGINEER and ctx.code_artifacts:
                     for task_id, code in ctx.code_artifacts.items():
                         fname = f"src/{task_id}.py"
                         add_log(cid, f"Generated {fname} ({len(code)} bytes)", gate=gate_name)
                     run.code_artifacts = json.dumps(ctx.code_artifacts)
+                    memory.store_episodic(cid, f"Generated {len(ctx.code_artifacts)} files", failed=False)
 
                 if gate_id in (PipelineGateID.ARCHITECTURE, PipelineGateID.QA, PipelineGateID.ENGINEER, PipelineGateID.CONVERGENCE):
                     db.commit()
 
-                add_log(cid, f"{gate_name}Gate complete — state: {ctx.current_state.name}", gate=gate_name)
+                add_log(cid, f"{gate_name}Gate complete — state: {ctx.current_state.name} ({latency}ms)", gate=gate_name)
             except Exception as exc:
                 run.current_state = "FAILED"
                 run.failure_reason = str(exc)
                 db.commit()
                 add_log(cid, f"{gate_name}Gate failed: {exc}", level="error", gate=gate_name)
+                memory.store_episodic(cid, f"Gate {gate_name} failed: {exc}", failed=True)
+
+                recovery = await orchestrator.handle_failure(ctx, str(exc))
+                if recovery.data.get("action") in ("retry_same", "simplify_context"):
+                    add_log(cid, f"Orchestrator recommends {recovery.data.get('action')} — retrying", gate=gate_name)
+                    continue
+                elif recovery.data.get("action") == "fallback_model":
+                    add_log(cid, f"Orchestrator recommends fallback model — aborting", gate=gate_name)
                 break
 
             if gate_id == PipelineGateID.ARCHITECTURE and ctx.sdd:
                 run.sdd_text = ctx.sdd
+            elif gate_id == PipelineGateID.RISK_ANALYSIS and ctx.risk_analysis:
+                run.sdd_text = (run.sdd_text or "") + "\n\n## Risk Analysis\n" + json.dumps({
+                    "risks": [{"description": r.description, "impact": r.impact, "probability": r.probability} for r in ctx.risk_analysis.risks],
+                    "trade_offs": [{"decision": t.decision, "recommended": t.recommended} for t in ctx.risk_analysis.trade_offs],
+                    "overall_risk_score": ctx.risk_analysis.overall_risk_score,
+                    "recommendations": ctx.risk_analysis.recommendations,
+                }, indent=2)
             elif gate_id == PipelineGateID.QA and ctx.test_suite:
                 run.test_suite = ctx.test_suite
             elif gate_id == PipelineGateID.CONVERGENCE:
@@ -235,7 +314,13 @@ async def _run_remaining_gates(cid: str, ctx: PipelineContext | None = None, db:
                 if gate_id == PipelineGateID.CONVERGENCE and ctx.failure_reason:
                     run.failure_reason = ctx.failure_reason
                     add_log(cid, f"Convergence details: {ctx.failure_reason}", level="warning", gate=gate_name)
+                    memory.store_episodic(cid, f"Convergence: {ctx.failure_reason}", failed=True)
                 db.commit()
+
+            decision = await orchestrator.decide_next_action(ctx)
+            if decision.data.get("action") in ("halt", "replan"):
+                add_log(cid, f"Orchestrator halts pipeline: {decision.data.get('reason', 'unknown')}", level="warning")
+                break
 
         run = db.query(PipelineRun).filter_by(correlation_id=cid).first()
         if run and run.current_state not in ("FAILED", "CANCELLED"):
@@ -349,6 +434,7 @@ async def get_pipeline_status(correlation_id: str, db: Session = Depends(get_db)
         spec=None,
         probing_questions=questions_data if questions else None,
         sdd=run.sdd_text,
+        risk_analysis=None,
         task_count=None,
         mutation_score=run.mutation_score,
         coverage_percent=run.coverage_percent,
@@ -356,6 +442,9 @@ async def get_pipeline_status(correlation_id: str, db: Session = Depends(get_db)
         is_converged=run.is_converged,
         is_cancelled=run.is_cancelled,
         interaction_pending=run.interaction_pending,
+        total_latency_ms=None,
+        total_tokens=None,
+        agent_trace=None,
     )
 
 

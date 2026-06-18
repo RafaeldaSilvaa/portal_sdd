@@ -46,6 +46,7 @@ class CircuitBreaker:
             PipelineGateID.SPEC: RollbackTarget.PREVIOUS_GATE,
             PipelineGateID.PROBING: RollbackTarget.PREVIOUS_GATE,
             PipelineGateID.ARCHITECTURE: RollbackTarget.PREVIOUS_GATE,
+            PipelineGateID.RISK_ANALYSIS: RollbackTarget.PREVIOUS_GATE,
             PipelineGateID.PLANNER: RollbackTarget.ARCHITECT,
             PipelineGateID.QA: RollbackTarget.PLANNER,
             PipelineGateID.ENGINEER: RollbackTarget.PLANNER,

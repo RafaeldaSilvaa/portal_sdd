@@ -18,6 +18,8 @@ export default function CodeExplorer({ correlationId }: CodeExplorerProps) {
   const [contentLoading, setContentLoading] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const treeScrollRef = useRef<HTMLDivElement>(null);
+  const selectedPathRef = useRef<string | null>(null);
 
   const fetchFiles = useCallback(async (initial = false) => {
     if (initial) setFilesLoading(true);
@@ -40,18 +42,26 @@ export default function CodeExplorer({ correlationId }: CodeExplorerProps) {
 
   useEffect(() => {
     if (!selectedPath) return;
+    if (selectedPathRef.current === selectedPath) return;
+    selectedPathRef.current = selectedPath;
     setContentLoading(true);
     setContentError(null);
-    setContent('');
     api.getFileContent(correlationId, selectedPath)
       .then((res) => setContent(res.content))
       .catch((err) => setContentError(err.message))
       .finally(() => setContentLoading(false));
-  }, [correlationId, selectedPath, files]);
+  }, [correlationId, selectedPath]);
 
   const handleSelect = useCallback((path: string) => {
     setSelectedPath(path);
-  }, []);
+    setContent('');
+    setContentLoading(true);
+    setContentError(null);
+    api.getFileContent(correlationId, path)
+      .then((res) => setContent(res.content))
+      .catch((err) => setContentError(err.message))
+      .finally(() => setContentLoading(false));
+  }, [correlationId]);
 
   const downloadUrl = api.getDownloadUrl(correlationId);
 
@@ -91,7 +101,7 @@ export default function CodeExplorer({ correlationId }: CodeExplorerProps) {
         </div>
       ) : (
         <div className="flex h-96">
-          <div className="w-56 shrink-0 border-r border-slate-800 overflow-y-auto bg-slate-900/30">
+          <div ref={treeScrollRef} className="w-56 shrink-0 border-r border-slate-800 overflow-y-auto bg-slate-900/30">
             <FileTree files={files} selectedPath={selectedPath} onSelect={handleSelect} />
           </div>
           <div className="flex-1 overflow-hidden">

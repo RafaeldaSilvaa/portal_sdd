@@ -98,6 +98,16 @@ export default function PipelineView() {
     } catch { }
   };
 
+  const [probeAnswers, setProbeAnswers] = useState<Record<string, string>>({});
+
+  const handleAnswerProbe = async (questionId: string) => {
+    const answer = probeAnswers[questionId];
+    if (!answer?.trim()) return;
+    await api.answerQuestion(questionId, answer.trim());
+    fetchStatus(correlationId!);
+    setProbeAnswers((p) => ({ ...p, [questionId]: '' }));
+  };
+
   if (!currentRun) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -189,12 +199,56 @@ export default function PipelineView() {
 
           {currentRun.probing_questions && currentRun.probing_questions.length > 0 && (
             <div className="rounded-xl border border-amber-800 bg-amber-950/20 p-4">
-              <h3 className="mb-2 text-sm font-semibold text-amber-400">Probing Questions</h3>
-              <div className="space-y-2">
+              <h3 className="mb-2 text-sm font-semibold text-amber-400">Perguntas de esclarecimento</h3>
+              <div className="space-y-3">
                 {currentRun.probing_questions.map((q) => (
                   <div key={q.id} className="text-sm">
-                    <p className="text-slate-300">{q.question}</p>
-                    <p className="mt-1 text-xs text-slate-500">{q.answered ? q.answer : 'Awaiting answer'}</p>
+                    <p className="mb-1 text-xs text-amber-500">{q.context}</p>
+                    <p className="text-slate-200">{q.question}</p>
+                    {q.answered ? (
+                      <p className="mt-1 text-xs text-emerald-400">Respondido: {q.answer}</p>
+                    ) : (
+                      <div className="mt-2">
+                        {q.options && q.options.length > 0 && (
+                          <div className="mb-2 grid grid-cols-1 gap-1">
+                            {q.options.map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() =>
+                                  setProbeAnswers((p) => ({ ...p, [q.id]: opt.value }))
+                                }
+                                className={`text-left px-2 py-1.5 rounded text-xs border transition-colors ${
+                                  probeAnswers[q.id] === opt.value
+                                    ? 'border-emasdep-500 bg-emasdep-600/20 text-emasdep-300'
+                                    : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={probeAnswers[q.id] ?? ''}
+                            onChange={(e) =>
+                              setProbeAnswers((p) => ({ ...p, [q.id]: e.target.value }))
+                            }
+                            placeholder="Digite sua resposta..."
+                            className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:ring-1 focus:ring-emasdep-500 focus:outline-none"
+                            onKeyDown={(e) => e.key === 'Enter' && handleAnswerProbe(q.id)}
+                          />
+                          <button
+                            onClick={() => handleAnswerProbe(q.id)}
+                            disabled={!probeAnswers[q.id]?.trim()}
+                            className="flex items-center gap-1 px-2 py-1.5 bg-emasdep-600 hover:bg-emasdep-500 disabled:opacity-50 rounded text-xs text-white"
+                          >
+                            <Send className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

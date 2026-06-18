@@ -23,12 +23,12 @@ export default function ProbingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-2xl rounded-xl border border-amber-800 bg-slate-900 shadow-2xl">
+      <div className="mx-4 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-amber-800 bg-slate-900 shadow-2xl">
         <div className="flex items-center justify-between border-b border-amber-800/50 px-6 py-4">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-400" />
             <h2 className="text-lg font-semibold text-white">
-              Clarification Required
+              Esclarecimentos necessários
             </h2>
           </div>
           <button
@@ -52,32 +52,50 @@ export default function ProbingModal({
 
               {q.answered ? (
                 <div className="rounded bg-emerald-900/20 px-3 py-2 text-sm text-emerald-400">
-                  Answered: {q.answer}
+                  Respondido: {q.answer}
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={answers[q.id] ?? ''}
-                    onChange={(e) =>
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [q.id]: e.target.value,
-                      }))
-                    }
-                    placeholder="Type your answer..."
-                    className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-emasdep-500 focus:outline-none"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSubmit(q.id);
-                    }}
-                  />
-                  <button
-                    onClick={() => handleSubmit(q.id)}
-                    disabled={!answers[q.id]?.trim()}
-                    className="flex items-center gap-1 rounded-lg bg-emasdep-600 px-3 py-2 text-sm font-medium text-white hover:bg-emasdep-500 disabled:opacity-50"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                  </button>
+                <div>
+                  {q.options && q.options.length > 0 && (
+                    <div className="mb-3 grid grid-cols-1 gap-1.5">
+                      {q.options.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() =>
+                            setAnswers((prev) => ({ ...prev, [q.id]: opt.value }))
+                          }
+                          className={`text-left px-3 py-2 rounded-lg text-sm border transition-colors ${
+                            answers[q.id] === opt.value
+                              ? 'border-emasdep-500 bg-emasdep-600/20 text-emasdep-300'
+                              : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600 hover:bg-slate-800'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={answers[q.id] ?? ''}
+                      onChange={(e) =>
+                        setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                      }
+                      placeholder="Ou digite sua resposta personalizada..."
+                      className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-emasdep-500 focus:outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSubmit(q.id);
+                      }}
+                    />
+                    <button
+                      onClick={() => handleSubmit(q.id)}
+                      disabled={!answers[q.id]?.trim()}
+                      className="flex items-center gap-1 rounded-lg bg-emasdep-600 px-3 py-2 text-sm font-medium text-white hover:bg-emasdep-500 disabled:opacity-50"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

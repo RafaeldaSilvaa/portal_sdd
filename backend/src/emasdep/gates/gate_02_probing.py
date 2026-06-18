@@ -1,11 +1,13 @@
-"""Gate 2: Proactive Probing & Clarification Loop."""
+"""Gate 2: Proactive Probing & Clarification Loop with LLM-generated questions."""
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
+from ..agents.base import LLMAgent, LLMConfig, LLMResponse
 from ..config import EMASDEPConfig
-from ..core.types import InputProperty, PipelineContext, PipelineGateID, PipelineState
+from ..core.types import PipelineContext, PipelineGateID, PipelineState
 
 
 @dataclass
@@ -18,7 +20,7 @@ class ProbingQuestionnaire:
             "action": "BLOCK_AND_PROBE" if self.ambiguity_score > 0.15 else "PROCEED_TO_DESIGN",
             "ambiguity_score": self.ambiguity_score,
             "threshold_limit": 0.15,
-            "reason": "Contrato de especificação abaixo da linha de corte de nitidez técnica."
+            "reason": "Especificação precisa de esclarecimentos adicionais."
             if self.ambiguity_score > 0.15
             else "Spec clarity approved.",
             "questionnaire": self.questions,
@@ -26,77 +28,74 @@ class ProbingQuestionnaire:
 
 
 class ProbingGate:
-    def __init__(self, config: EMASDEPConfig | None = None):
+    def __init__(self, config: EMASDEPConfig | None = None, llm_config: LLMConfig | None = None):
         self.config = config or EMASDEPConfig()
+        self.llm_config = llm_config
         self.gate_id = PipelineGateID.PROBING
 
     async def process(self, ctx: PipelineContext) -> PipelineContext:
         if not ctx.spec:
             return ctx
 
-        result = self.evaluate_spec_clarity("", ctx.spec)
+        result = await self.evaluate_spec_clarity(ctx.spec)
         if result["action"] == "BLOCK_AND_PROBE":
             ctx.current_state = PipelineState.BLOCKED_PROBE
         return ctx
 
-    def evaluate_spec_clarity(self, raw_intent: str, spec: dict) -> dict:
-        missing_fields: list[str] = []
+    async def evaluate_spec_clarity(self, spec: dict) -> dict:
         questionnaire = ProbingQuestionnaire()
 
         if not isinstance(spec, dict):
             return questionnaire.to_dict()
 
-        meta = spec.get("project_metadata", {})
-        if not isinstance(meta, dict):
-            meta = {}
-
-        if not meta.get("project_type"):
-            questionnaire.questions.append({
-                "id": "q_01_project_type",
-                "context": "Tipo de projeto",
-                "question": "Que tipo de projeto é este? (web_api, cli, library, pipeline, mobile_backend)",
-            })
-        if not meta.get("framework"):
-            questionnaire.questions.append({
-                "id": "q_02_framework",
-                "context": "Framework",
-                "question": "Qual framework ou biblioteca principal devo usar? (ex: FastAPI, Flask, Django, plain Python)",
-            })
-        if not meta.get("deployment_target"):
-            questionnaire.questions.append({
-                "id": "q_03_deployment",
-                "context": "Deploy",
-                "question": "Onde este projeto será executado? (docker, serverless, vm, edge)",
-            })
-        if not meta.get("structured_as"):
-            questionnaire.questions.append({
-                "id": "q_04_structure",
-                "context": "Estrutura",
-                "question": "Como o código deve ser estruturado? (modular com pacotes separados, monolítico, microserviços)",
-            })
-
-        inputs: list[InputProperty] = spec.get("contract_interface", {}).get("strict_inputs", [])
-        for inp in inputs:
-            if not isinstance(inp, dict):
-                continue
-            name = inp.get("name", "unknown")
-            if not inp.get("pattern") and inp.get("type") == "string":
-                missing_fields.append(f"Regra de validação (pattern) para input: {name}")
-            if inp.get("minimum") is None and inp.get("type") in ("integer", "number"):
-                missing_fields.append(f"Valor mínimo não definido para input: {name}")
-
-        if not spec.get("fail_safe_protocols"):
-            missing_fields.append("Mapeamento de cenários de falha e tratamento de exceções")
-
-        questionnaire.ambiguity_score = (len(missing_fields) + len(questionnaire.questions)) / 10.0
-
-        if questionnaire.ambiguity_score > self.config.ambiguity_threshold:
-            for idx, mf in enumerate(missing_fields[:3]):
-                questionnaire.questions.append({
-                    "id": f"q_{idx+5:02d}_ambiguity",
-                    "context": mf,
-                    "question": f"Como o sistema deve se comportar diante de: {mf}? "
-                    f"Defina a estratégia de validação e fallback.",
-                })
+        if self.llm_config and self.llm_config.provider.name != "MOCK":
+            questions = await self._llm_generate_questions(spec)
+            if questions:
+                questionnaire.questions = questions
+                questionnaire.ambiguity_score = len(questions) / 5.0
+                return questionnaire.to_dict()
 
         return questionnaire.to_dict()
+
+    async def _llm_generate_questions(self, spec: dict) -> list[dict]:
+        agent = _ProbingAgent(config=self.llm_config)
+        prompt = (
+            f"Analyze this software specification and generate probing questions "
+            f"to clarify ambiguities. For each missing or unclear field, provide a "
+            f"question with 4-5 concrete numbered options that make sense for this project.\n\n"
+            f"Specification:\n{json.dumps(spec, indent=2, ensure_ascii=False)}\n\n"
+            "Output a JSON array of objects. Each object:\n"
+            "{\n"
+            '  "id": "q_01_unique_id",\n'
+            '  "context": "short context label",\n'
+            '  "question": "clear question text",\n'
+            '  "options": [{"label": "1. Option text", "value": "option_value"}, ...]\n'
+            "}\n\n"
+            "Rules:\n"
+            "- Only ask about MISSING or UNCLEAR fields\n"
+            "- Each question MUST have 4-5 numbered options that are relevant to the spec\n"
+            "- Include a 'Custom' option (value: 'other') as the last option\n"
+            "- Max 7 questions. Output ONLY valid JSON array."
+        )
+        try:
+            response: LLMResponse = await agent.call(
+                prompt=prompt,
+                system_prompt=agent.build_system_prompt(),
+            )
+            data = json.loads(response.content)
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict) and "questions" in data:
+                return data["questions"]
+            return []
+        except (json.JSONDecodeError, Exception):
+            return []
+
+
+class _ProbingAgent(LLMAgent):
+    def build_system_prompt(self) -> str:
+        return (
+            "You are a Requirements Analyst. "
+            "Analyze specifications for ambiguities and generate clarifying questions "
+            "with relevant numbered options. Output ONLY valid JSON."
+        )

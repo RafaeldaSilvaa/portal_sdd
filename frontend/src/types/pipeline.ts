@@ -30,10 +30,16 @@ export interface PipelineStatus {
   interaction_pending: string | null;
 }
 
+export interface ProbingOption {
+  label: string;
+  value: string;
+}
+
 export interface ProbingQuestion {
   id: string;
   context: string;
   question: string;
+  options?: ProbingOption[];
   answer: string | null;
   answered: boolean;
 }
@@ -69,6 +75,7 @@ export type PipelineState =
   | 'SPEC_V1'
   | 'BLOCKED_PROBE'
   | 'DESIGN'
+  | 'RISK_ANALYSIS'
   | 'PLANNING'
   | 'TESTING'
   | 'CODING'

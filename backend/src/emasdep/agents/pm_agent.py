@@ -35,6 +35,11 @@ class PMAgent(LLMAgent):
                 "- architectural_invariants\n"
                 "- mutation_testing_criteria\n"
                 "- fail_safe_protocols\n"
+                "- context (domain, assumptions as list, dependencies as list)\n"
+                "- constraints (list of {type: performance|cost|security, description})\n"
+                "- acceptance_criteria (list of {id, description, measurable})\n"
+                "- failure_modes (list of {type, cause, mitigation})\n"
+                "- observability (logs as list, metrics as list, tracing as list)\n"
                 "Output ONLY valid JSON."
             ),
             system_prompt=self.build_system_prompt(),
@@ -124,4 +129,24 @@ class PMAgent(LLMAgent):
                     "reversal_action": "abort_and_emit_compensation",
                 }
             ],
+            "context": {
+                "domain": "general",
+                "assumptions": ["Standard operating environment"],
+                "dependencies": ["Python 3.12+"],
+            },
+            "constraints": [
+                {"type": "performance", "description": "Response under 500ms"},
+                {"type": "security", "description": "Input validation required"},
+            ],
+            "acceptance_criteria": [
+                {"id": "AC-01", "description": "All tests pass", "measurable": True},
+            ],
+            "failure_modes": [
+                {"type": "input_error", "cause": "Invalid input", "mitigation": "Return 400"},
+            ],
+            "observability": {
+                "logs": ["application"],
+                "metrics": ["response_time", "error_rate"],
+                "tracing": ["request_id"],
+            },
         }

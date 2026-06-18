@@ -15,6 +15,7 @@ from .core.types import (
 from .gates.gate_01_spec import SpecGate
 from .gates.gate_02_probing import ProbingGate
 from .gates.gate_03_arch import ArchitectureGate
+from .gates.gate_45_risk import RiskAnalysisGate
 from .gates.gate_04_planner import PlannerGate
 from .gates.gate_05_qa import QAGate
 from .gates.gate_06_engineer import EngineerGate
@@ -46,6 +47,7 @@ class PipelineOrchestrator:
             PipelineGateID.SPEC: SpecGate(),
             PipelineGateID.PROBING: ProbingGate(),
             PipelineGateID.ARCHITECTURE: ArchitectureGate(),
+            PipelineGateID.RISK_ANALYSIS: RiskAnalysisGate(),
             PipelineGateID.PLANNER: PlannerGate(),
             PipelineGateID.QA: QAGate(),
             PipelineGateID.ENGINEER: EngineerGate(),
@@ -69,6 +71,7 @@ class PipelineOrchestrator:
                 )
 
             ctx = await self._gates[PipelineGateID.ARCHITECTURE].process(ctx)
+            ctx = await self._gates[PipelineGateID.RISK_ANALYSIS].process(ctx)
             ctx = await self._gates[PipelineGateID.PLANNER].process(ctx)
             ctx = await self._gates[PipelineGateID.QA].process(ctx)
             ctx = await self._gates[PipelineGateID.ENGINEER].process(ctx)

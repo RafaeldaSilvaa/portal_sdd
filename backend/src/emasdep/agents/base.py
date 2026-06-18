@@ -76,7 +76,20 @@ class LLMAgent(ABC):
     def __init__(self, config: LLMConfig | None = None):
         self.config = config or LLMConfig(provider=LLMProvider.MOCK)
 
+    def _enrich_with_skills(self, system_prompt: str) -> str:
+        try:
+            from ..skills.registry import SkillRegistry
+            skills = SkillRegistry().discover()
+            if skills:
+                extra = "\n\n## Injected Skills\n" + "\n---\n".join(s.name + "\n" + s.content for s in skills)
+                return system_prompt + extra
+        except Exception:
+            pass
+        return system_prompt
+
     async def call(self, prompt: str, system_prompt: str | None = None) -> LLMResponse:
+        if system_prompt:
+            system_prompt = self._enrich_with_skills(system_prompt)
         cfg = self.config
         if cfg.provider == LLMProvider.MOCK:
             return self._mock_response(prompt)

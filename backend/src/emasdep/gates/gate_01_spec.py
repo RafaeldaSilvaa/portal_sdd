@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import json
+
+from ..agents.pm_agent import PMAgent
+from ..agents.base import LLMConfig
 from ..core.types import PipelineContext, PipelineGateID, PipelineState, SpecContract
 from .base import PipelineGate
 
 
 class SpecGate(PipelineGate):
+    def __init__(self, llm_config: LLMConfig | None = None):
+        self._pm_agent = PMAgent(config=llm_config)
+
     @property
     def gate_id(self) -> PipelineGateID:
         return PipelineGateID.SPEC
@@ -15,10 +22,16 @@ class SpecGate(PipelineGate):
     def name(self) -> str:
         return "Specification Contract"
 
-    async def process(self, ctx: PipelineContext) -> PipelineContext:
+    async def process(self, ctx: PipelineContext, raw_intent: str = "") -> PipelineContext:
         ctx.current_gate = self.gate_id
         ctx.current_state = PipelineState.SPEC_V1
         ctx.telemetry.pipeline_gate = self.name
+        if raw_intent:
+            try:
+                spec = await self._pm_agent.generate_spec(raw_intent)
+                ctx.spec = spec
+            except Exception:
+                pass
         return ctx
 
     def validate_spec(self, spec: SpecContract) -> list[str]:
